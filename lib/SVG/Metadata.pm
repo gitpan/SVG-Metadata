@@ -78,7 +78,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 
 use fields qw(

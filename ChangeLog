@@ -1,3 +1,7 @@
+2004-10-04 21:38  bryce
+
+	* scripts/svg_annotate:  Adding -k,--keywords feature
+
 2004-08-06 00:38  bryce
 
 	* lib/SVG/Metadata, scripts/svg_annotate:  Keywords functionality

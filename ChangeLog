@@ -1,3 +1,7 @@
+2004-10-10 12:15  bryce
+
+	* lib/SVG/Metadata.pm:  Adding escaping of <, >, and & for rdf
+
 2004-10-04 21:38  bryce
 
 	* scripts/svg_annotate:  Adding -k,--keywords feature

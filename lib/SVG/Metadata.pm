@@ -78,7 +78,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 
 use fields qw(
@@ -170,6 +170,7 @@ sub keywords_to_rdf {
     my $text = '';
 
     foreach my $keyword ($self->keywords()) {
+	$keyword = $self->esc_ents($keyword);
 	$text .= "            <rdf:li>$keyword</rdf:li>\n";
     }
 
@@ -256,8 +257,12 @@ sub parse {
 	return undef;
     }
 
-    my $ref = $twig->simplify(); # forcecontent => 1);
-
+    my $ref;
+    eval {
+	$ref = $twig->simplify(); # forcecontent => 1);
+    };
+    return undef if ($@);
+    
     if (! defined($ref)) {
 	$self->{_ERRORMSG} = "XML::Twig did not return a valid XML object";
 	return undef;
@@ -550,6 +555,23 @@ sub to_text {
     return $text;
 }
 
+=head2 esc_ents($text)
+
+Escapes '<', '>', and '&' to avoid causing rdf to become invalid.
+
+=cut
+
+sub esc_ents {
+    my $self = shift;
+    my $text = shift;
+    return $text unless $text;
+
+    $text =~ s|\<|\&lt;|g;
+    $text =~ s|\>|\&gt;|g;
+    $text =~ s|\&|\&amp;|g;
+    return $text;
+}
+
 =head2 to_rdf()
 
 Generates an RDF snippet to describe the item.  This includes the
@@ -560,20 +582,20 @@ character.
 
 sub to_rdf {
     my $self = shift;
-
+    
     my $about_url     = ''; # TODO
-    my $title         = $self->title()               || '';
-    my $creator       = $self->creator()             || '';
-    my $creator_url   = $self->creator_url()     || '';
-    my $owner         = $self->owner()               || '';
-    my $owner_url     = $self->owner_url()         || '';
+    my $title         = $self->esc_ents($self->title())           || '';
+    my $creator       = $self->esc_ents($self->creator())         || '';
+    my $creator_url   = $self->esc_ents($self->creator_url())     || '';
+    my $owner         = $self->esc_ents($self->owner())           || '';
+    my $owner_url     = $self->esc_ents($self->owner_url())       || '';
     my $date          = ''; # TODO
-    my $license       = $self->license()             || '';
-    my $license_date  = $self->license_date()   || '';
-    my $description   = $self->description()     || '';
-    my $subject       = $self->subject()             || $self->keywords_to_rdf();
-    my $publisher     = $self->publisher()         || '';
-    my $publisher_url = $self->publisher_url() || '';
+    my $license       = $self->esc_ents($self->license())         || '';
+    my $license_date  = $self->esc_ents($self->license_date())    || '';
+    my $description   = $self->esc_ents($self->description())     || '';
+    my $subject       = $self->esc_ents($self->subject())         || $self->keywords_to_rdf();
+    my $publisher     = $self->esc_ents($self->publisher())       || '';
+    my $publisher_url = $self->esc_ents($self->publisher_url())   || '';
     my $language      = 'en'; # TODO
 
     my $license_rdf   = ''; 

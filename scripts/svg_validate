@@ -87,7 +87,7 @@ sub main {
     find({ wanted => \&wanted, no_chdir => 1}, @search_dirs);
 
     # Print reports
-    if ($Results) {
+    if (defined $Results) {
 	# Print index($Results)
 
 	# Print results PASS / FAIL of ($Results)
@@ -98,6 +98,8 @@ sub main {
 	}
 	print REPORT passfail_report($Results);
 	close(REPORT);
+    } else {
+	warn "No PASSFAIL report generated\n";
     }
 
     return 1;
@@ -206,10 +208,12 @@ sub process_file {
     my $svgmeta = new SVG::Metadata;
 
     my ($fn,$dir,$ext)  = fileparse($filename, qr{\.[^\.]*?});
+
     $ext =~ s|^\.||;
     my $pngname = $fn.'.png';
     my $metaname = $fn.".txt";
 
+    warn " Parsing file\n" if $opt_debug>3;
     if (!$svgmeta->parse($filename)) {
 	$Results->{$fn}->{parse} = "FAIL";
 	warn ' '.$svgmeta->errormsg()."\n" if $opt_debug>0;
@@ -276,11 +280,13 @@ sub process_file {
 	    return 0;
 	}
 
+	warn " Copying file\n" if $opt_debug>3;
 	if (!copy($filename, $d)) {
 	    warn " Could not copy file to target dir '$d': $!\n" if $opt_debug>0;
 	    return 0;
 	}
 
+	warn " Creating metadata\n" if $opt_debug>3;
 	if (! create_meta($svgmeta, catfile($d, $metaname))) {
 	    # Add note to $Results
 	    $Results->{$fn}->{metafile} = "FAIL";
@@ -290,6 +296,7 @@ sub process_file {
 	    $Results->{$fn}->{metafile} = "PASS";
 	}
 
+	warn " Creating png thumbnail\n" if $opt_debug>3;
 	if (! create_png($filename, catfile($d, $pngname))) {
 	    # Add note to $Results
 	    $Results->{$fn}->{render} = "FAIL";

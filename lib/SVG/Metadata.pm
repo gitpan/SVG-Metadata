@@ -77,7 +77,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 
 use fields qw(
@@ -137,6 +137,16 @@ sub AUTOLOAD {
     die "Invalid attribute method: ->$attr()\n" unless exists $FIELDS{"_$attr"};
     $self->{"_$attr"} = shift if @_;
     return $self->{"_$attr"};
+}
+
+=head2 author()
+
+Alias for creator()
+
+=cut
+sub author {
+    my $self = shift;
+    return $self->creator(@_);
 }
 
 =head2 errormsg()
@@ -482,7 +492,7 @@ sub to_rdf {
 
     my $about_url = ''; # TODO
     my $title   = $self->title();
-    my $creator = $self->author();
+    my $creator = $self->creator();
     my $creator_url = $self->creator_url();
     my $owner   = $self->owner();
     my $owner_url = $self->owner_url();

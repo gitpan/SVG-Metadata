@@ -63,8 +63,12 @@ sub main {
 	if (-d $file) {
 	    push(@search_dirs, $file);
 	} elsif (-f $file) {
-	    process_file($file, $Annote_meta)
-		or warn "Could not process $file\n";
+	    if ($opt_delete) {
+		remove_rdf($file);
+	    } else {
+		process_file($file, $Annote_meta)
+		    or warn "Could not process $file\n";
+	    }
 	}
     }
 

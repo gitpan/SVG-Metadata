@@ -13,7 +13,7 @@ collateraldir=$3
 
 # TODO:  Copy in README, LICENSE, etc.
 echo "cp $collateraldir/README $destdir/"
-cp $collateraldir/README $distdir/
+cp $collateraldir/README $distdir/README.txt
 echo "cp $collateraldir/LICENSE.txt $destdir/"
 cp $collateraldir/LICENSE.txt $distdir/
 

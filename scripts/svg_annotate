@@ -21,6 +21,7 @@ our $opt_author       = '';
 our $opt_owner        = '';
 our $opt_license      = 'http://web.resource.org/cc/PublicDomain';
 our $opt_title        = 'Clipart by <AUTHOR> - <FILEBASE>';
+our $opt_delete       = 0;
 
 Getopt::Long::Configure ("bundling", "no_ignore_case");
 GetOptions(
@@ -32,6 +33,7 @@ GetOptions(
 	   "owner|o=s",
 	   "license|l=s",
 	   "title|t=s",
+	   "delete",
            ) or pod2usage(-verbose => 1, -exitstatus => 0);
 
 if ($opt_version) {
@@ -67,7 +69,11 @@ sub main {
 
     sub wanted {
 	if (!-d && /\.svg$/) {
-	    process_file($File::Find::name, $Annote_meta);
+	    if ($opt_delete) {
+		remove_rdf($File::Find::name);
+	    } else {
+		process_file($File::Find::name, $Annote_meta);
+	    }
 	}
     }
     
@@ -126,11 +132,58 @@ sub process_file {
 
     close(OLDSVGFILE) or warn "Could not close '$file': $!\n";
     close(NEWSVGFILE) or warn "Could not close '$file': $!\n";
-    rename($file, "$file.orig") or warn "Could not rename $file to $file.orig: $!\n";
-    rename($tmpfile, $file) or warn "Could not rename $tmpfile to $file: $!\n";
+    if (! rename($file, "$file.orig")) {
+	warn "Could not rename $file to $file.orig: $!\n";
+	return 0;
+    }
+    if (! rename($tmpfile, $file)) {
+	warn "Could not rename $tmpfile to $file: $!\n";
+	return 0;
+    }
 
-    # Validate the file
+    # TODO:  Validate the file
     my $newsvgmeta = new SVG::Metadata;
+
+    return 1;
+}
+
+
+sub remove_rdf {
+    my $file = shift;
+
+    warn "Removing metadata from '$file'\n" if $opt_debug>0;
+
+    my ($fn,$dir,$ext)  = fileparse($file, '\..*?');
+    my $tmpfile = $fn . ".tmp";
+
+    if (!open(OLDSVGFILE, "<$file")) {
+	warn "Could not open '$file' for reading:  $!\n";
+	return 0;
+    }
+    if (!open(NEWSVGFILE, ">$tmpfile")) {
+	warn "Could not open '$file' for writing:  $!\n";
+	return 0;
+    }
+
+    # Undef newline as line separator so the read is the whole file
+    undef $/;
+    while (<OLDSVGFILE>) {
+	$_ =~ s|<metadata.*?</metadata>||gs;
+	$_ =~ s|<rdf:RDF.*?</rdf:RDF>||gs;
+	$_ =~ s|<rdf.*?</rdf>||gs;
+	print NEWSVGFILE $_;
+    }
+
+    close(OLDSVGFILE) or warn "Could not close '$file': $!\n";
+    close(NEWSVGFILE) or warn "Could not close '$file': $!\n";
+    if (! rename($file, "$file.orig")) {
+	warn "Could not rename $file to $file.orig: $!\n";
+	return 0;
+    }
+    if (! rename($tmpfile, $file)) {
+	warn "Could not rename $tmpfile to $file: $!\n";
+	return 0;
+    }
 
     return 1;
 }
@@ -156,7 +209,7 @@ svg_annotate [OPTIONS] [file1[, file2]] [subdir1[, subdir2...]]
  -o, --owner=s     Name of the owner to use in the RDF
  -l, --license=s   License URL to use in the RDF
  -t, --title=s     Title string to use in the RDF
-
+     --delete      Removes the RDF section(s) from the SVG file(s)
 
 =head1 DESCRIPTION
 
@@ -170,7 +223,7 @@ of images to quickly and easily annotate entire trees of files with
 metadata.  The main aim of this is to assist the artists of the Open 
 Clip Art Library (http://www.openclipart.org).
 
-=head2 EXAMPLES
+=head1 EXAMPLES
 
 Annotate all the items in or under the current directory, with da Vinci
 as the artist.  By default, license is Public Domain, and for
@@ -197,6 +250,19 @@ svg_annotate allows several fill-ins to be used in the title field:
     <LOCALTIME> - the current date and time
     <GMTIME>    - the current date and time in Coordinated Universal Time (UTC) format
     
+
+It is also possible to delete the RDF from one or more files, using the
+C<--delete> flag.  For instance:
+
+  svg_annotate --delete  *.svg
+
+This will work recursively into any directories specified on the
+commandline, working on any *.svg files it finds in the indicated
+directory tree.  E.g.:
+
+  svg_annotate --delete  my_svg_files/
+
+
 =head1 OPTIONS
 
 =over 8
@@ -234,18 +300,25 @@ typical licenses.  By default it uses the Public Domain license,
 The title to use for all the indicated files.  Note that several fill-in
 parameters are included, for a little dynamism (see DESCRIPTION, above).
 
+=item B<--delete>
+
+Causes svg_annotate to operate in RDF-deletion mode.  Instead of adding
+RDF, the script will instead parse the SVG file and remove any metadata
+sections, as distinguished by the tags <rdf>, <rdf:RDF>, or <metadata>.
+
 =back
 
 =head1 PREREQUISITES
 
-C<Pod::Usage>,
-C<Getopt::Long>,
-C<File::Basename>,
-C<File::Copy>,
-C<File::Find>,
-C<File::Path>,
-C<File::Spec>,
-C<SVG::Metadata>
+L<Pod::Usage>,
+L<Getopt::Long>,
+L<File::Basename>,
+L<File::Copy>,
+L<File::Find>,
+L<File::Path>,
+L<File::Spec>,
+L<XML::Twig>,
+L<SVG::Metadata>
 
 =head1 COREQUISITES
 

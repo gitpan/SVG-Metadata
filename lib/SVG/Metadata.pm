@@ -68,7 +68,8 @@ package SVG::Metadata;
 use 5.006;
 use strict;
 use warnings;
-use XML::Simple;
+use XML::Twig;
+
 
 use vars qw($VERSION @ISA);
 
@@ -76,12 +77,13 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.01';
+our $VERSION = '0.03';
 
 
 use fields qw(
               _title
 	      _author
+	      _owner
 	      _license
               _keywords
               _errormsg
@@ -167,35 +169,59 @@ sub parse {
 	return undef;
     }
 
-    my $ref = eval { XMLin($filename) };
+    my $twig = XML::Twig->new( map_xmlns => {
+				'http://web.resource.org/cc/' => "cc",
+				'http://www.w3.org/1999/02/22-rdf-syntax-ns#' => "rdf",
+				'http://purl.org/dc/elements/1.1/' => "dc",
+				},
+			       pretty_print => 'indented',
+			);
+    eval { $twig->parsefile($filename); };
 
     if ($@) {
 	$self->{_errormsg} = "Error parsing file:  $@";
 	return undef;
     }
 
+    my $ref=$twig->simplify(); # forcecontent => 1);
+
     if (! defined($ref)) {
-	$self->{_errormsg} = "XML::Simple did not return a valid XML object";
+	$self->{_errormsg} = "XML::Twig did not return a valid XML object";
 	return undef;
     }
 
-    if (! defined($ref->{'rdf:RDF'})) {
-	$self->{_errormsg} = "No rdf:RDF element found in document.";
+    my $rdf = $ref->{'rdf:RDF'};
+    if (! defined($rdf)) {
+	$self->{_errormsg} = "No 'RDF' element found in document.";
 	return undef;
     }
 
-    my $metadata = $ref->{'rdf:RDF'};
-
-    if (!defined($metadata->{'ns:Work'})) {
-	$self->{_errormsg} = "No ns:Work element found in the rdf:RDF element";
+    my $work = $rdf->{'cc:Work'};
+    if (! defined($work)) {
+	$self->{_errormsg} = "No 'Work' element found in the 'RDF' element";
 	return undef;
     }
 
-    $self->{_title}   = $metadata->{'ns:Work'}->{'dc:title'} || '';
-    $self->{_author}  = $metadata->{'ns:Work'}->{'dc:rights'}->{'ns:Agent'}->{'dc:title'} || '';
-    $self->{_license} = $metadata->{'ns:Work'}->{'ns:license'}->{'rdf:resource'} || '';
+    $self->{_title}   = _get_content($work->{'dc:title'}) || '';
+    $self->{_author}  = _get_content($work->{'dc:creator'}->{'cc:Agent'}->{'dc:title'}) || '';
+    $self->{_owner}   = _get_content($work->{'dc:rights'}->{'cc:Agent'}->{'dc:title'}) || '';
+    $self->{_license} = _get_content($work->{'cc:license'}->{'rdf:resource'}) || '';
+
+    # Default the author
+    $self->{_author} ||= $self->{_owner};
 
     return 1;
+}
+
+# XML::Twig::simplify has a bug where it only accepts "forcecontent", but
+# the option to do that function is actually recognized as "force_content".
+# As a result, we have to test to see if we're at a HASH node or a scalar.
+sub _get_content
+{
+	my ($content)=@_;
+
+	return $content->{'content'} if (UNIVERSAL::isa($content,"HASH"));
+	return $content;
 }
 
 
@@ -383,7 +409,7 @@ __END__
 
 =head1 PREREQUISITES
 
-C<XML::Simple>
+C<XML::Twig>
 
 =head1 AUTHOR
 
@@ -391,7 +417,7 @@ Bryce Harrington <bryce@bryceharrington.com>
 
 =head1 COPYRIGHT
                                                                                 
-Copyright (C) 2002-2003 Bryce Harrington.
+Copyright (C) 2004 Bryce Harrington.
 All Rights Reserved.
  
 This script is free software; you can redistribute it and/or
@@ -399,6 +425,6 @@ modify it under the same terms as Perl itself.
  
 =head1 SEE ALSO
 
-L<perl>, L<XML::Simple>
+L<perl>, L<XML::Twig>
 
 =cut

@@ -1,8 +1,8 @@
 use ExtUtils::MakeMaker;
 #
 my %opts = (
-	    'NAME'	=> 'SVG::Metadata',
-	    'VERSION'   => 0.02,
+	    'NAME'	   => 'SVG::Metadata',
+	    'VERSION_FROM' => qw( lib/SVG/Metadata.pm ),
 	    'EXE_FILES' => [ qw( scripts/validate_svg ) ],
 	    'PREREQ_PM' => { 
 		'Pod::Usage'     => 1.14,
@@ -12,7 +12,7 @@ my %opts = (
 		'File::Find'     => 1.04,
 		'File::Path'     => 1.0404,
 		'File::Basename' => 2.6,
-		'XML::Simple'    => 2.05,
+		'XML::Twig'      => 3.00,
 	    },
 	    'EXE_FILES' => [ qw( scripts/svg_validate
 				 ) ],

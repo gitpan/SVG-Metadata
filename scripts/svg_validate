@@ -42,6 +42,7 @@ my $Results;
 #------------------------------------------------------------------------
 our $opt_version    = 0;
 our $opt_help       = 0;
+our $opt_man        = 0;
 our $opt_debug      = 1;
 our $opt_noclobber  = 0;  # Prevent script from overwriting existing files
 our $opt_target_dir = 'default-0.00';
@@ -50,13 +51,14 @@ Getopt::Long::Configure ("bundling", "no_ignore_case");
 GetOptions(
            "version|V",      # Prints the version and exits
            "help|h",         # Prints a brief help message
+           "man",            # Prints extended help
 	   "debug|D=i",      # Prints debug messages
 	   "noclobber|n",    # Sets script to not overwrite existing files
 	   "target_dir|t=s", # Specifies where files should be placed
            ) or pod2usage(-verbose => 1, -exitstatus => 0);
 
 if ($opt_version) {
-    print "$VERSION\n";
+    print "$SVG::Metadata::VERSION\n";
     exit 0;
 }
 
@@ -92,8 +94,6 @@ sub main {
 	print REPORT passfail_report($Results);
 	close(REPORT);
     }
-
-    # TODO:  Add LICENSE, README, AUTHORS, INDEX, etc.
 
     return 1;
 }

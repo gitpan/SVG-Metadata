@@ -15,7 +15,7 @@ my %opts = (
 		'XML::Twig'      => 3.00,
 	    },
 	    'EXE_FILES' => [ qw( scripts/svg_validate
-				 ) ],
+				 scripts/svg_annotate ) ],
 	    );
 
 if ($ExtUtils::MakeMaker::VERSION >= 5.43) {

@@ -4,3 +4,4 @@ Makefile.PL
 MANIFEST
 README
 scripts/svg_validate
+scripts/svg_annotate

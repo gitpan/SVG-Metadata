@@ -104,15 +104,16 @@ sub process_file {
     my $file = shift;
     my $svgmeta = shift || die "No svgmeta object passed to process_file\n";
 
+    my $title = $svgmeta->title();
+
     warn "Processing file '$file'\n" if $opt_debug>0;
 
     my ($fn,$dir,$ext)  = fileparse($file, '\..*?');
 
-    if ($svgmeta->title() =~ /</) {
-	my $title     = $svgmeta->title();
+    if ($title =~ /</) {
 	my $author    = $svgmeta->author();
 	my $owner     = $svgmeta->owner();
-	my $keywords  = join(", ", $svgmeta->keywords());
+	my $keywords  = join(", ", ($svgmeta->keywords()||''));
 	my $localtime = localtime();
 	my $gmtime    = gmtime();
 	$title =~ s/<FILENAME>/$file/g;
@@ -124,7 +125,6 @@ sub process_file {
 	$title =~ s/<KEYWORDS>/$keywords/g;
 	$title =~ s/<LOCALTIME>/$localtime/g;
 	$title =~ s/<GMTIME>/$gmtime/g;
-	$svgmeta->title($title);
     }
 
     my $tmpfile = $fn . ".tmp";
@@ -141,7 +141,10 @@ sub process_file {
     my $seen_rdf = 0;
     while (<OLDSVGFILE>) {
 	if (m|</svg>| && ! $seen_rdf) {
+	    my $orig_title = $svgmeta->title();
+	    $svgmeta->title($title);
 	    print NEWSVGFILE $svgmeta->to_rdf();
+	    $svgmeta->title($orig_title);
 	} elsif (m|</rdf:RDF>|i or m|</rdf>|i) {
 	    $seen_rdf = 1;
 	}
@@ -160,7 +163,7 @@ sub process_file {
     }
 
     # TODO:  Validate the file
-    my $newsvgmeta = new SVG::Metadata;
+#    my $newsvgmeta = new SVG::Metadata;
 
     return 1;
 }

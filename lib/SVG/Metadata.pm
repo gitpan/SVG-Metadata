@@ -71,6 +71,7 @@ use 5.006;
 use strict;
 use warnings;
 use XML::Twig;
+use HTML::Entities;
 
 # use Data::Dumper;
 
@@ -78,7 +79,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 
 use fields qw(
@@ -557,7 +558,8 @@ sub to_text {
 
 =head2 esc_ents($text)
 
-Escapes '<', '>', and '&' to avoid causing rdf to become invalid.
+Escapes '<', '>', and '&' and other extended characters
+to avoid causing rdf to become invalid.
 
 =cut
 
@@ -566,10 +568,7 @@ sub esc_ents {
     my $text = shift;
     return $text unless $text;
 
-    $text =~ s|\<|\&lt;|g;
-    $text =~ s|\>|\&gt;|g;
-    $text =~ s|\&|\&amp;|g;
-    return $text;
+    return encode_entities($text);
 }
 
 =head2 to_rdf()

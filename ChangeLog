@@ -1,3 +1,11 @@
+2004-10-17 23:00  bryce
+
+	* lib/SVG/Metadata.pm:  Switching to use of HTML::Entities
+
+	* scripts/svg_annotate:  For automatically generated titles,
+	  instead of using the first filename for titles of all images, 
+	  use each file's filename.
+
 2004-10-10 12:15  bryce
 
 	* lib/SVG/Metadata.pm:  Adding escaping of <, >, and & for rdf

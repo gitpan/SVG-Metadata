@@ -79,7 +79,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 
 use fields qw(
@@ -311,10 +311,14 @@ sub parse {
 
     if ($self->{_subject} && ref $self->{_subject} eq 'HASH' && 
 	defined $self->{_subject}->{'rdf:Bag'}) {
-	$self->{_keywords}      = @{_get_content($work->{'dc:subject'}->{'rdf:Bag'})};
+        if (ref $subjectwords) { # Multiple keywords
+	    $self->{_keywords} = { map { $_=>1 } @$subjectwords };
+        } else { # Only one keyword
+	    $self->{_keywords} = { $subjectwords => 1 } ;
+        }
 	$self->{_subject}       = undef;
     } else {
-	$self->{_keywords} = undef;
+	$self->{_keywords} = { unsorted => 1 };
     }
 
     return 1;
@@ -426,7 +430,7 @@ sub keywords {
 }
 
 
-=head2 addKeywords($kw1 [, $kw2 ...])
+=head2 addKeyword($kw1 [, $kw2 ...])
 
 Adds one or more a new keywords.  Note that the keywords are stored
 internally as a set, so only one copy of a given keyword will be stored.

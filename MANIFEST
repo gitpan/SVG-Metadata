@@ -1,4 +1,6 @@
+COPYING
 lib/SVG/Metadata.pm
 Makefile.PL
 MANIFEST
+README
 scripts/svg_validate

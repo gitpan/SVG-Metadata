@@ -2,7 +2,7 @@ use ExtUtils::MakeMaker;
 #
 my %opts = (
 	    'NAME'	=> 'SVG::Metadata',
-	    'VERSION'   => 0.01,
+	    'VERSION'   => 0.02,
 	    'EXE_FILES' => [ qw( scripts/validate_svg ) ],
 	    'PREREQ_PM' => { 
 		'Pod::Usage'     => 1.14,
@@ -19,7 +19,7 @@ my %opts = (
 	    );
 
 if ($ExtUtils::MakeMaker::VERSION >= 5.43) {
-    $opts{AUTHOR}   = 'Bryce Harrington <bryce@osdl.org>';
+    $opts{AUTHOR}   = 'Bryce Harrington <bryce@bryceharrington.com>';
     $opts{ABSTRACT} = 'Parsing and validating RDF metadata in SVG files';
 }
  

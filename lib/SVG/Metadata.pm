@@ -41,14 +41,27 @@ SVG::Metadata - Perl module to capture metadata info about an SVG file
 This module provides a way of extracting, browsing and using RDF
 metadata embedded in an SVG file.
 
+The SVG spec itself does not provide any particular mechanisms for
+handling metadata, but instead relies on embedded, namespaced RDF
+sections, as per XML philosophy.  Unfortunately, many SVG tools don't
+support the concept of RDF metadata; indeed many don't support the idea
+of embedded XML "islands" at all.  Some will even ignore and drop the
+rdf data entirely when encountered.
+
+The motivation for this module is twofold.  First, it provides a
+mechanism for accessing this metadata from the SVG files.  Second, it
+provides a means of validating SVG files to detect if they have the
+metadata.
+
+The motivation for this script is primarily for the Open Clip Art
+Library (http://www.openclipart.org), as a way of filtering out
+submissions that lack metadata from being included in the official
+distributions.  A secondary motivation is to serve as a testing tool for
+SVG editors like Inkscape (http://www.inkscape.org).
+
 =head1 FUNCTIONS
 
 =cut
-
-
-# TODO:
-#   * Test the example script
-#   * Fill in the rest of the POD stuff
 
 package SVG::Metadata;
 
@@ -76,10 +89,13 @@ use fields qw(
 use vars qw( %FIELDS );
 
 
-=head2 new
+=head2 new()
 
 Creates a new SVG::Metadata object.  Optionally, can pass in arguments
 'title', 'author', and/or 'license'.
+
+ my $svgmeta = new SVG::Metadata;
+ my $svgmeta = new SVG::Metadata(title=>'My title', author=>'Me', license=>'Public Domain');
 
 =cut
 
@@ -98,10 +114,13 @@ sub new {
     return $self;
 }
 
-=head2 errormsg
+
+=head2 errormsg()
 
 Returns the last encountered error message.  Most of the error messages
 are encountered during file parsing.
+
+    print $svgmeta->errormsg();
 
 =cut
 
@@ -111,7 +130,7 @@ sub errormsg {
 }
 
 
-=head2 parse
+=head2 parse($filename)
 
 Extracts RDF metadata out of an existing SVG file.
 
@@ -124,7 +143,13 @@ missing, it
 
 Returns undef if there was a problem parsing the file, and sets an 
 error message appropriately.  The conditions under which it will return
-undef are as follows:  No 'filename' parameter given
+undef are as follows:  
+
+   * No 'filename' parameter given.
+   * Filename does not exist.
+   * Document is not parseable SVG.
+   * No rdf:RDF element was found in the document.
+   * The rdf:RDF element did not have a ns:Work sub-element
 
 =cut
 
@@ -173,7 +198,8 @@ sub parse {
     return 1;
 }
 
-=head2 title
+
+=head2 title()
 
 Gets or sets the title.
 
@@ -192,7 +218,7 @@ sub title {
 }
 
 
-=head2 author
+=head2 author()
 
 Gets or sets the author.
 
@@ -211,7 +237,7 @@ sub author {
 }
 
 
-=head2 license
+=head2 license()
 
 Gets or sets the license.
 
@@ -230,9 +256,10 @@ sub license {
 }
 
 
-=head2 keywords
+=head2 keywords()
 
-Gets or sets an array of keywords
+Gets or sets an array of keywords.  Keywords are a categorization
+mechanism, and can be used, for example, to sort the files topically.
 
 =cut
 
@@ -247,11 +274,12 @@ sub keywords {
 }
 
 
-=head2 addKeywords
+=head2 addKeywords($kw1 [, $kw2 ...])
 
-Adds one or more a new keywords
+Adds one or more a new keywords.  Note that the keywords are stored
+internally as a set, so only one copy of a given keyword will be stored.
 
-    $svgmeta->addKeyword('Fruit');
+    $svgmeta->addKeyword('Fruits and Vegetables');
     $svgmeta->addKeyword('Fruit','Vegetable','Animal','Mineral');
 
 =cut
@@ -264,9 +292,11 @@ sub addKeyword {
 }
 
 
-=head2 removeKeyword
+=head2 removeKeyword($kw)
 
 Removes a given keyword 
+
+    $svgmeta->removeKeyword('Fruits and Vegetables');
 
 Return value:  The keyword removed.
 
@@ -280,7 +310,7 @@ sub removeKeyword {
 }
 
 
-=head2 hasKeyword 
+=head2 hasKeyword($kw)
 
 Returns true if the metadata includes the given keyword
 
@@ -295,7 +325,7 @@ sub hasKeyword {
     return (defined($self->{_keywords}->{$keyword}));
 }
 
-=head2 compare
+=head2 compare($meta2)
 
 Compares this metadata to another metadata for equality.
 
@@ -316,10 +346,15 @@ sub compare {
 }
 
 
-=head2 to_text
+=head2 to_text()
 
 Creates a plain text representation of the metadata, suitable for
-debuggery, emails, etc.
+debuggery, emails, etc.  Example output:
+
+ Title:    SVG Road Signs
+ Author:   John Cliff
+ License:  http://web.resource.org/cc/PublicDomain
+ Keywords: unsorted
 
 Return value is a string containing the title, author, license, and
 keywords, each value on a separate line.
@@ -346,10 +381,22 @@ sub to_text {
 1;
 __END__
 
+=head1 PREREQUISITES
+
+C<XML::Simple>
+
 =head1 AUTHOR
 
 Bryce Harrington <bryce@bryceharrington.com>
 
+=head1 COPYRIGHT
+                                                                                
+Copyright (C) 2002-2003 Bryce Harrington.
+All Rights Reserved.
+ 
+This script is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+ 
 =head1 SEE ALSO
 
 L<perl>, L<XML::Simple>

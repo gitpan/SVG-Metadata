@@ -77,7 +77,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 
 use fields qw(
@@ -263,6 +263,25 @@ sub author {
 }
 
 
+=head2 owner()
+
+Gets or sets the owner.
+
+    $svgmeta->owner('Bris Geek');
+    print $svgmeta->owner();
+
+=cut
+
+sub owner {
+    my $self = shift;
+    my $new_owner = shift;
+    if ($new_owner) {
+	$self->{_owner} = $new_owner;
+    }
+    return $self->{_owner};
+}
+
+
 =head2 license()
 
 Gets or sets the license.
@@ -383,25 +402,67 @@ debuggery, emails, etc.  Example output:
  Keywords: unsorted
 
 Return value is a string containing the title, author, license, and
-keywords, each value on a separate line.
+keywords, each value on a separate line.  The text always ends with
+a newline character.
 
 =cut
 
 sub to_text {
     my $self = shift;
 
-    my $text = "";
-    $text .= "Title:    " . $self->title() . "\n";
-    $text .= "Author:   " . $self->author() . "\n";
-    $text .= "License:  " . $self->license() . "\n";
-    $text .= "Keywords: ";
+    my $text = '';
+    $text .= 'Title:    ' . $self->title() . "\n";
+    $text .= 'Author:   ' . $self->author() . "\n";
+    $text .= 'License:  ' . $self->license() . "\n";
+    $text .= 'Keywords: ';
     $text .= join("\n          ", $self->keywords());
     $text .= "\n";
 
     return $text;
 }
 
-# TODO:  to_rdf
+=head2 to_rdf()
+
+Generates an RDF snippet to describe the item.  This includes the
+author, title, license, etc.  The text always ends with a newline
+character.
+
+=cut
+
+sub to_rdf {
+    my $self = shift;
+
+    my $title   = $self->title();
+    my $author  = $self->author();
+    my $owner   = $self->owner();
+    my $license = $self->license();
+
+    return qq(
+  <rdf:RDF 
+   xmlns="http://web.resource.org/cc/"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <Work rdf:about="">
+    <dc:title>$title</dc:title>
+    <dc:rights>
+       <Agent>
+         <dc:title>$author</dc:title>
+       </Agent>
+    </dc:rights>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+    <license rdf:resource="$license" />
+  </Work>
+   
+  <License rdf:about="$license">
+     <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+     <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+     <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+  </License>
+
+</rdf:RDF>
+);
+
+}
 
 
 1;

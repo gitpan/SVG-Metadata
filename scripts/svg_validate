@@ -43,7 +43,7 @@ my $Results;
 our $opt_version    = 0;
 our $opt_help       = 0;
 our $opt_man        = 0;
-our $opt_debug      = 1;
+our $opt_debug      = 0;
 our $opt_noclobber  = 0;  # Prevent script from overwriting existing files
 our $opt_target_dir = 'default-0.00';
 

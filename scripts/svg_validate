@@ -99,7 +99,7 @@ sub main {
 }
 
 sub wanted {
-    if (!-d && /\.svg$/) {
+    if (!-d && /\.svg$/i) {
 	process_file($File::Find::name, $opt_target_dir);
     }
 }
@@ -256,35 +256,37 @@ sub process_file {
     }
 
     # Copy it to the target directory
-    my $d = catdir($target_dir, 'unsorted');  # TODO:  Base dir off keywords
+    foreach my $category ($svgmeta->keywords()) {
+	my $d = catdir($target_dir, $category);
 
-    eval { mkpath([$d], 0, 0755) };
-    if ($@) {
-	warn "Could not create directory '$d': $@";
-	return 0;
-    }
+	eval { mkpath([$d], 0, 0755) };
+	if ($@) {
+	    warn "Could not create directory '$d': $@";
+	    return 0;
+	}
 
-    if (!copy($filename, $d)) {
-	warn " Could not copy file to target dir '$d': $!\n" if $opt_debug>0;
-	return 0;
-    }
+	if (!copy($filename, $d)) {
+	    warn " Could not copy file to target dir '$d': $!\n" if $opt_debug>0;
+	    return 0;
+	}
 
-    if (! create_meta($svgmeta, catfile($d, $metaname))) {
-	# Add note to $Results
-	$Results->{$fn}->{metafile} = "FAIL";
-	warn " Could not create metadata text file\n" if $opt_debug>0;
-	$retval = 0;
-    } else {
-	$Results->{$fn}->{metafile} = "PASS";
-    }
+	if (! create_meta($svgmeta, catfile($d, $metaname))) {
+	    # Add note to $Results
+	    $Results->{$fn}->{metafile} = "FAIL";
+	    warn " Could not create metadata text file\n" if $opt_debug>0;
+	    $retval = 0;
+	} else {
+	    $Results->{$fn}->{metafile} = "PASS";
+	}
 
-    if (! create_png($filename, catfile($d, $pngname))) {
-	# Add note to $Results
-	$Results->{$fn}->{render} = "FAIL";
-	warn " Could not create png '$pngname' in '$target_dir'\n" if $opt_debug>0;
-	$retval = 0;
-    } else {
-	$Results->{$fn}->{render} = "PASS";
+	if (! create_png($filename, catfile($d, $pngname))) {
+	    # Add note to $Results
+	    $Results->{$fn}->{render} = "FAIL";
+	    warn " Could not create png '$pngname' in '$target_dir'\n" if $opt_debug>0;
+	    $retval = 0;
+	} else {
+	    $Results->{$fn}->{render} = "PASS";
+	}
     }
 
     print " File produced return value '$retval'\n" if $opt_debug>1;

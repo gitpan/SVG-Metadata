@@ -17,6 +17,10 @@ cp $collateraldir/README $distdir/
 echo "cp $collateraldir/LICENSE.txt $destdir/"
 cp $collateraldir/LICENSE.txt $distdir/
 
+# Copy in the release's template example
+echo "cp -r $collateraldir/examples/ $destdir/"
+cp -r $collateraldir/examples/ $destdir/
+
 # TODO:  Create tarball files
 echo "tar czf $distname.tgz $distdir"
 tar czf $distname.tgz $distdir

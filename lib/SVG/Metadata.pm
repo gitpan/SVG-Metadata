@@ -6,6 +6,8 @@ SVG::Metadata - Perl module to capture metadata info about an SVG file
 
  use SVG::Metadata;
 
+ my $svgmeta = new SVG::Metadata;
+
  $svgmeta->parse($filename) 
      or die "Could not parse $filename: " . $svgmeta->errormsg();
  $svgmeta2->parse($filename2)
@@ -77,7 +79,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 
 use fields qw(
@@ -307,7 +309,8 @@ sub parse {
     $self->{_publisher}     ||= $self->{_owner};
     $self->{_publisher_url} ||= $self->{_owner_url};
 
-    if ($self->{_subject} && defined $self->{_subject}->{'rdf:Bag'}) {
+    if ($self->{_subject} && ref $self->{_subject} eq 'HASH' && 
+	defined $self->{_subject}->{'rdf:Bag'}) {
 	$self->{_keywords}      = @{_get_content($work->{'dc:subject'}->{'rdf:Bag'})};
 	$self->{_subject}       = undef;
     } else {

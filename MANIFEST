@@ -13,5 +13,5 @@ scripts/svg_annotate
 scripts/svg_validate
 scripts/test_it
 scripts/unpack_clipart
-t/0.use.t
-t/1.keywords.t
+t/0.use.foo
+t/1.keywords.foo

@@ -1,0 +1,267 @@
+#!/usr/bin/perl -w 
+
+# This script scans a directory full of *.svg files and checks
+# them to see if they have proper metadata.  If so, it copies
+# them into a target directory and creates a png of it. 
+# It also creates a list of PASS and FAIL for the different
+# criteria.
+
+# TODO
+#   * (DONE) Generate the PASS / FAIL report
+#   * Create an HTML indexpage
+#   * Switch to using Carp instead of print/warn
+#   * Add commandline handling for directory, etc.
+#   * Autogenerate the AUTHORS file
+#   * Autogenerate the INDEX file
+#   * Add keyword support (review RDF)
+#   * Automatically create the zip and tarballs
+#   * Copy the README & LICENSE
+#   * Capture the LOG to the LOG file
+#   * Upload this to CPAN
+
+use strict;
+use Pod::Usage;
+use Getopt::Long;
+use File::Basename;
+use File::Copy;
+use File::Find;
+use File::Path;
+use File::Spec::Functions;
+use SVG::Metadata;
+
+my $Results;
+
+our $opt_noclobber = 0;  # Prevent script from overwriting existing files
+our $opt_target_dir = '../openclipart-0.01';
+our $opt_debug = 1;
+
+
+sub main {
+    my @search_dirs = ('.');
+
+    # TODO:  Handle this in a less heavy-duty manner
+    if (-e $opt_target_dir) {
+	`rm -rf $opt_target_dir`;
+    }
+    eval { mkpath([$opt_target_dir], 0, 0755) };
+    if ($@) {
+	warn "Could not create directory '$opt_target_dir': $@";
+	return 0;
+    }
+
+    find({ wanted => \&wanted, no_chdir => 1}, @search_dirs);
+
+    # Print reports
+    if ($Results) {
+	# Print index($Results)
+
+	# Print results PASS / FAIL of ($Results)
+	my $reportname = catfile($opt_target_dir, 'PASSFAIL');
+	if (! open (REPORT, ">$reportname")) {
+	    warn "Could not open report '$reportname' for writing: $!\n";
+	    return 0;
+	}
+	print REPORT passfail_report($Results);
+	close(REPORT);
+    }
+
+    # TODO:  Add LICENSE, README, AUTHORS, INDEX, etc.
+
+    return 1;
+}
+
+sub wanted {
+    if (!-d && /\.svg$/) {
+	process_file($File::Find::name, $opt_target_dir);
+    }
+}
+
+sub create_meta {
+    my $svgmeta = shift || return 0;
+    my $metaname = shift || return 0;
+
+    if (-e $metaname) {
+	if ($opt_noclobber) {
+	    warn "Can't overwrite existing '$metaname':  --noclobber option is set\n";
+	    return 0;
+	} else {
+	    warn "Removing existing '$metaname'\n";
+	    if (!unlink $metaname) {
+		warn "Could not remove existing '$metaname': $!\n";
+		return 0;
+	    }
+	}
+    }
+
+    if (! open METAFILE, ">$metaname") {
+	warn "Could not open meta file '$metaname' for writing: $!\n";
+	return 0;
+    }
+
+    print METAFILE $svgmeta->to_text();
+
+    if (! close(METAFILE)) {
+	warn "Could not close meta file '$metaname': $!\n";
+	# We'll let it pass - shouldn't be fatal...  we hope
+    }
+
+    return 1;
+}
+
+sub create_png {
+    my $filename = shift || return 0;
+    my $pngname = shift || return 0;
+
+    if (-e $pngname) {
+	if ($opt_noclobber) {
+	    warn "Can't overwrite existing $pngname:  --noclobber options is set\n";
+	    return 0;
+	} else {
+	    warn "Removing existing $pngname\n";
+	    unlink $pngname;
+	}
+    }
+
+    print "Calling 'inkscape -f $filename -e $pngname -w 80'\n";
+    print `inkscape -f $filename -e $pngname -w 80`;
+
+    if ($?) {
+	warn "Inkscape returned error:  ".($?/256)."\n";
+	return 0;
+    }
+
+    if (! -e $pngname) {
+	warn "Inkscape failed to generate $pngname\n";
+	return 0;
+    }
+
+    return 1;
+}
+
+sub passfail_report {
+    my $results = shift;
+
+    my $text = '';
+
+    $text .= sprintf("%-40s Parse Title Authr Lcnse Kywds\n", 'Filename');
+    $text .= ('-'x70) . "\n";
+    foreach my $fn (keys %{$results}) {
+	$text .= sprintf("%-40s   ", $fn.'.svg');
+	foreach my $field (qw(parse title authorship license keywords)) {
+	    my $result = $results->{$fn}->{$field};
+	    if ($result && $result eq 'PASS') {
+		$text .= 'X     ';
+	    } else {
+		$text .= '      ';
+	    }
+	}
+	$text .= "\n";
+    }
+    return $text;
+}
+
+# Returns true if the file successfully passed validation and 
+# was processed and stored in the target path, false otherwise.
+sub process_file {
+    my $filename = shift;
+    my $target_dir = shift;
+
+    warn "Processing file '$filename'\n" if $opt_debug>0;
+
+    my $retval = 1;
+    my $svgmeta = new SVG::Metadata;
+
+    my ($fn,$dir,$ext)  = fileparse($filename, '\..*?');
+    $ext =~ s|^\.||;
+    my $pngname = $fn.'.png';
+    my $metaname = $fn.".txt";
+
+    if (!$svgmeta->parse($filename)) {
+	$Results->{$fn}->{parse} = "FAIL";
+	warn ' '.$svgmeta->errormsg()."\n" if $opt_debug>0;
+    } else {
+	$Results->{$fn}->{parse} = "PASS";
+    }
+
+    if (! $svgmeta->title()) {
+	# Record that it failed on title
+	$Results->{$fn}->{title} = "FAIL";
+	warn " Could not verify the title\n" if $opt_debug>1;
+	$retval = 0;
+    } else {
+	$Results->{$fn}->{title} = "PASS";
+    }
+
+    if (! $svgmeta->author()) {
+	# Add note to $Results
+	$Results->{$fn}->{authorship} = "FAIL";
+	warn " Could not verify the authorship\n" if $opt_debug>1;
+	$retval = 0;
+    } else {
+	$Results->{$fn}->{authorship} = "PASS";
+    }
+
+    if (! $svgmeta->license()) {
+	# Record that it failed on license
+	$Results->{$fn}->{license} = "FAIL";
+	warn " Could not verify the license\n" if $opt_debug>1;
+	$retval = 0;
+    } else {
+	$Results->{$fn}->{license} = "PASS";
+    }
+ 
+    if (! $svgmeta->keywords()) {
+	# Set keyword to a default one
+	$Results->{$fn}->{keywords} = "FAIL";
+	$svgmeta->addKeyword('unsorted');
+    } elsif ($svgmeta->keywords() == 1 && $svgmeta->hasKeyword('unsorted')) {
+	$Results->{$fn}->{keywords} = "FAIL";
+    } else {
+	$Results->{$fn}->{keywords} = "PASS";
+    }
+
+    # If there was anything wrong with the metadata, we reject the file 
+    # and proceed to the next iteration here.
+    if ($retval == 0) {
+	warn " Skipping file '$fn' since failed metadata test\n" if $opt_debug>0;
+	return $retval;
+    }
+
+    # Copy it to the target directory
+    my $d = catdir($target_dir, 'unsorted');  # TODO:  Base dir off keywords
+
+    eval { mkpath([$d], 0, 0755) };
+    if ($@) {
+	warn "Could not create directory '$d': $@";
+	return 0;
+    }
+
+    if (!copy($filename, $d)) {
+	warn " Could not copy file to target dir '$d': $!\n" if $opt_debug>0;
+	return 0;
+    }
+
+    if (! create_meta($svgmeta, catfile($d, $metaname))) {
+	# Add note to $Results
+	$Results->{$fn}->{metafile} = "FAIL";
+	warn " Could not create metadata text file\n" if $opt_debug>0;
+	$retval = 0;
+    } else {
+	$Results->{$fn}->{metafile} = "PASS";
+    }
+
+    if (! create_png($filename, catfile($d, $pngname))) {
+	# Add note to $Results
+	$Results->{$fn}->{render} = "FAIL";
+	warn " Could not create png '$pngname' in '$target_dir'\n" if $opt_debug>0;
+	$retval = 0;
+    } else {
+	$Results->{$fn}->{render} = "PASS";
+    }
+
+    print " File produced return value '$retval'\n" if $opt_debug>1;
+    return $retval;
+}
+
+main();
+

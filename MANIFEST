@@ -1,0 +1,4 @@
+lib/SVG/Metadata.pm
+Makefile.PL
+MANIFEST
+scripts/svg_validate

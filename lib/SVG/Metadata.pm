@@ -77,24 +77,33 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 
 use fields qw(
               _title
-	      _author
+              _description
+              _subject
+              _publisher
+              _publisher_url
+	      _creator
+	      _creator_url
 	      _owner
+	      _owner_url
 	      _license
+              _license_date
               _keywords
-              _errormsg
+              _language
+              _ERRORMSG
+              _strict_validation
 	      );
-use vars qw( %FIELDS );
+use vars qw( %FIELDS $AUTOLOAD );
 
 
 =head2 new()
 
 Creates a new SVG::Metadata object.  Optionally, can pass in arguments
-'title', 'author', and/or 'license'.
+'title', 'author', 'license', etc..
 
  my $svgmeta = new SVG::Metadata;
  my $svgmeta = new SVG::Metadata(title=>'My title', author=>'Me', license=>'Public Domain');
@@ -107,15 +116,28 @@ sub new {
 
     my $self = bless [\%FIELDS], $class;
 
-    $self->{_title}    = $args{title} || '';
-    $self->{_author}   = $args{author} || '';
-    $self->{_license}  = $args{license} || '';
-    $self->{_keywords} = $args{keywords} || {};
-    $self->{_errormsg} = '';
+    while (my ($field, $value) = each %args) {
+	$self->{"_$field"} = $value
+	    if (exists $FIELDS{"_$field"});
+    }
+    $self->{_creator}         ||= $args{author} || '';
+    $self->{_language}        ||= 'en';
+    $self->{_ERRORMSG}          = '';
+    $self->{_strict_validation} = 0;
 
     return $self;
 }
 
+# This automatically generates all the accessor functions for %FIELDS
+sub AUTOLOAD {
+    my $self = shift;
+    my $attr = $AUTOLOAD;
+    $attr =~ s/.*:://;
+    return unless $attr =~ /[^A-Z]/; # skip DESTROY and all-cap methods
+    die "Invalid attribute method: ->$attr()\n" unless exists $FIELDS{"_$attr"};
+    $self->{"_$attr"} = shift if @_;
+    return $self->{"_$attr"};
+}
 
 =head2 errormsg()
 
@@ -128,7 +150,7 @@ are encountered during file parsing.
 
 sub errormsg {
     my $self = shift;
-    return $self->{_errormsg};
+    return $self->{_ERRORMSG};
 }
 
 
@@ -142,6 +164,9 @@ This routine looks for a field in the rdf:RDF section of the document
 named 'ns:Work' and then attempts to load the following keys from it:
 'dc:title', 'dc:rights'->'ns:Agent', and 'ns:license'.  If any are
 missing, it 
+
+The $filename parameter can be a filename, or a text string containing
+the XML to parse, or an open 'IO::Handle', or a URL.
 
 Returns undef if there was a problem parsing the file, and sets an 
 error message appropriately.  The conditions under which it will return
@@ -160,12 +185,7 @@ sub parse {
     my $filename = shift;
 
     if (! defined($filename)) {
-	$self->{_errormsg} = "No filename argument defined for parsing";
-	return undef;
-    }
-
-    if (! -e $filename) {
-	$self->{_errormsg} = "Filename '$filename' does not exist";
+	$self->{_ERRORMSG} = "No filename or text argument defined for parsing";
 	return undef;
     }
 
@@ -176,39 +196,69 @@ sub parse {
 				},
 			       pretty_print => 'indented',
 			);
-    eval { $twig->parsefile($filename); };
 
+    if ($filename =~ m/\n.*\n/ || (ref $filename eq 'IO::Handle')) {
+	# Hmm, if it has newlines, it is likely to be a string instead of a filename
+	eval { $twig->parse($filename); };
+    } elsif ($filename =~ /^http/ or $filename =~ /^ftp/) {
+	eval { $twig->parseurl($filename); };
+    } elsif (! -e $filename) {
+	$self->{_ERRORMSG} = "Filename '$filename' does not exist";
+	return undef;
+    } else {
+	eval { $twig->parsefile($filename); };
+    }
+	
     if ($@) {
-	$self->{_errormsg} = "Error parsing file:  $@";
+	$self->{_ERRORMSG} = "Error parsing file:  $@";
 	return undef;
     }
 
-    my $ref=$twig->simplify(); # forcecontent => 1);
+    my $ref = $twig->simplify(); # forcecontent => 1);
 
     if (! defined($ref)) {
-	$self->{_errormsg} = "XML::Twig did not return a valid XML object";
+	$self->{_ERRORMSG} = "XML::Twig did not return a valid XML object";
 	return undef;
     }
 
-    my $rdf = $ref->{'rdf:RDF'};
-    if (! defined($rdf)) {
-	$self->{_errormsg} = "No 'RDF' element found in document.";
-	return undef;
+    my $metadata = $ref->{'metadata'} || $ref->{'#default:metadata'};
+    my $rdf;
+    if (! defined($metadata) ) {
+	$rdf = $ref->{'rdf:RDF'};
+	if (! defined($rdf)) {
+	    $self->{_ERRORMSG} = "No 'RDF' element found in document.";
+	    return undef;
+	} else {
+	    $self->{_ERRORMSG} = "'RDF' element not defined in a <metadata></metadata> block";
+	    return undef if ($self->{_strict_validation});
+	} 
+    } else {
+	$rdf = $metadata->{'rdf:RDF'};
+	if (! defined($rdf)) {
+	    $self->{_ERRORMSG} = "No 'RDF' element found in the <metadata> element in the document.";
+	    return undef;
+	}
     }
 
     my $work = $rdf->{'cc:Work'};
     if (! defined($work)) {
-	$self->{_errormsg} = "No 'Work' element found in the 'RDF' element";
+	$self->{_ERRORMSG} = "No 'Work' element found in the 'RDF' element";
 	return undef;
     }
 
-    $self->{_title}   = _get_content($work->{'dc:title'}) || '';
-    $self->{_author}  = _get_content($work->{'dc:creator'}->{'cc:Agent'}->{'dc:title'}) || '';
-    $self->{_owner}   = _get_content($work->{'dc:rights'}->{'cc:Agent'}->{'dc:title'}) || '';
-    $self->{_license} = _get_content($work->{'cc:license'}->{'rdf:resource'}) || '';
-
-    # Default the author
-    $self->{_author} ||= $self->{_owner};
+    $self->{_title}         = _get_content($work->{'dc:title'}) || '';
+    $self->{_description}   = _get_content($work->{'dc:description'}) || '';
+    $self->{_subject}       = _get_content($work->{'dc:subject'}) || '';
+    $self->{_publisher}     = _get_content($work->{'dc:publisher'}) || '';
+    $self->{_publisher_url} = 'http://www.openclipart.org'; # TODO
+    $self->{_creator}       = _get_content($work->{'dc:creator'}->{'cc:Agent'}->{'dc:title'}) || '';
+    $self->{_creator_url}   = ''; # TODO
+    $self->{_owner}         = _get_content($work->{'dc:rights'}->{'cc:Agent'}->{'dc:title'}) || '';
+    $self->{_owner_url}     = ''; # TODO
+    $self->{_license}       = _get_content($work->{'cc:license'}->{'rdf:resource'}) || '';
+    $self->{_license_date}  = ''; # TODO
+    $self->{_keywords}      = {}; # TODO
+    $self->{_language}      = 'en'; # TODO
 
     return 1;
 }
@@ -216,14 +266,12 @@ sub parse {
 # XML::Twig::simplify has a bug where it only accepts "forcecontent", but
 # the option to do that function is actually recognized as "force_content".
 # As a result, we have to test to see if we're at a HASH node or a scalar.
-sub _get_content
-{
-	my ($content)=@_;
+sub _get_content {
+    my ($content)=@_;
 
-	return $content->{'content'} if (UNIVERSAL::isa($content,"HASH"));
-	return $content;
+    return $content->{'content'} if (UNIVERSAL::isa($content,"HASH"));
+    return $content;
 }
-
 
 =head2 title()
 
@@ -232,36 +280,39 @@ Gets or sets the title.
     $svgmeta->title('My Title');
     print $svgmeta->title();
 
-=cut
+=head2 description()
 
-sub title {
-    my $self = shift;
-    my $new_title = shift;
-    if ($new_title) {
-	$self->{_title} = $new_title;
-    }
-    return $self->{_title};
-}
+Gets or sets the description
 
+=head2 subject()
+
+Gets or sets the subject
+
+=head2 publisher()
+
+Gets or sets the publisher name.  E.g., 'Open Clip Art Library'
+
+=head2 publisher_url()
+
+Gets or sets the web URL for the publisher.  E.g., 'http://www.openclipart.org'
+
+=head2 creator()
+
+Gets or sets the creator.
+
+    $svgmeta->creator('Bris Geek');
+    print $svgmeta->creator();
+
+=head2 creator_url()
+
+Gets or sets the URL for the creator.
 
 =head2 author()
 
-Gets or sets the author.
+Alias for creator() - does the same thing
 
     $svgmeta->author('Bris Geek');
     print $svgmeta->author();
-
-=cut
-
-sub author {
-    my $self = shift;
-    my $new_author = shift;
-    if ($new_author) {
-	$self->{_author} = $new_author;
-    }
-    return $self->{_author};
-}
-
 
 =head2 owner()
 
@@ -270,17 +321,9 @@ Gets or sets the owner.
     $svgmeta->owner('Bris Geek');
     print $svgmeta->owner();
 
-=cut
+=head2 owner_url()
 
-sub owner {
-    my $self = shift;
-    my $new_owner = shift;
-    if ($new_owner) {
-	$self->{_owner} = $new_owner;
-    }
-    return $self->{_owner};
-}
-
+Gets or sets the owner URL for the item
 
 =head2 license()
 
@@ -289,16 +332,21 @@ Gets or sets the license.
     $svgmeta->license('Public Domain');
     print $svgmeta->license();
 
+=head2 license_date()
+
+Gets or sets the date that the item was licensed
+
+=head2 language()
+
+Gets or sets the language for the metadata.  This should be in the
+two-letter lettercodes, such as 'en', etc.
+
+=head2 strict_validation()
+
+Gets or sets the strict validation option.  
+
 =cut
 
-sub license {
-    my $self = shift;
-    my $new_license = shift;
-    if ($new_license) {
-	$self->{_license} = $new_license;
-    }
-    return $self->{_license};
-}
 
 
 =head2 keywords()
@@ -432,34 +480,70 @@ character.
 sub to_rdf {
     my $self = shift;
 
+    my $about_url = ''; # TODO
     my $title   = $self->title();
-    my $author  = $self->author();
+    my $creator = $self->author();
+    my $creator_url = $self->creator_url();
     my $owner   = $self->owner();
+    my $owner_url = $self->owner_url();
+    my $date    = ''; # TODO
     my $license = $self->license();
+    my $license_date = $self->license_date();
+    my $description = $self->description();
+    my $subject = $self->subject();
+    my $publisher = $self->publisher();
+    my $publisher_url = $self->publisher_url();
+    my $language = 'en'; # TODO
+
+    my $license_rdf = ''; 
+    if ($license eq 'Public Domain'
+	or $license eq 'http://web.resource.org/cc/PublicDomain') {
+	$license_rdf = qq(
+      <License rdf:about="$license">
+         <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+         <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+         <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+      </License>
+
+);
+    }
 
     return qq(
-  <rdf:RDF 
-   xmlns="http://web.resource.org/cc/"
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-  <Work rdf:about="">
-    <dc:title>$title</dc:title>
-    <dc:rights>
-       <Agent>
-         <dc:title>$author</dc:title>
-       </Agent>
-    </dc:rights>
-    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-    <license rdf:resource="$license" />
-  </Work>
-   
-  <License rdf:about="$license">
-     <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
-     <permits rdf:resource="http://web.resource.org/cc/Distribution" />
-     <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
-  </License>
-
-</rdf:RDF>
+  <metadata>
+    <rdf:RDF 
+     xmlns="http://web.resource.org/cc/"
+     xmlns:dc="http://purl.org/dc/elements/1.1/"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+      <Work rdf:about="$about_url">
+        <dc:title>$title</dc:title>
+	<dc:description>$description</dc:description>
+        <dc:subject>$subject</dc:subject>
+        <dc:publisher>
+           <Agent rdf:about="$publisher_url">
+             <dc:title>$publisher</dc:title>
+           </Agent>
+         </dc:publisher>
+         <dc:creator>
+           <Agent rdf:about="$creator_url">
+             <dc:title>$creator</dc:title>
+           </Agent>
+        </dc:creator>
+         <dc:rights>
+           <Agent rdf:about="$owner_url">
+             <dc:title>$owner</dc:title>
+           </Agent>
+        </dc:rights>
+        <dc:date>$date</dc:date>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <license rdf:resource="$license">
+	  <dc:date>$license_date</dc:date>
+	</license>
+        <dc:language>$language</dc:language>
+      </Work>
+$license_rdf
+    </rdf:RDF>
+  </metadata>
 );
 
 }

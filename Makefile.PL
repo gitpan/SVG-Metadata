@@ -12,7 +12,7 @@ my %opts = (
 		'File::Find'     => 1.04,
 		'File::Path'     => 1.0404,
 		'File::Basename' => 2.6,
-		'XML::Twig'      => 3.00,
+		'XML::Twig'      => 3.15,  # Tested on 3.09: didn't work.
 	    },
 	    'EXE_FILES' => [ qw( scripts/svg_validate
 				 scripts/svg_annotate ) ],

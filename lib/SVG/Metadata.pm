@@ -77,7 +77,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 
 use fields qw(
@@ -160,7 +160,7 @@ are encountered during file parsing.
 
 sub errormsg {
     my $self = shift;
-    return $self->{_ERRORMSG};
+    return $self->{_ERRORMSG} || '';
 }
 
 
@@ -491,18 +491,18 @@ sub to_rdf {
     my $self = shift;
 
     my $about_url = ''; # TODO
-    my $title   = $self->title();
-    my $creator = $self->creator();
-    my $creator_url = $self->creator_url();
-    my $owner   = $self->owner();
-    my $owner_url = $self->owner_url();
+    my $title   = $self->title()               || '';
+    my $creator = $self->creator()             || '';
+    my $creator_url = $self->creator_url()     || '';
+    my $owner   = $self->owner()               || '';
+    my $owner_url = $self->owner_url()         || '';
     my $date    = ''; # TODO
-    my $license = $self->license();
-    my $license_date = $self->license_date();
-    my $description = $self->description();
-    my $subject = $self->subject();
-    my $publisher = $self->publisher();
-    my $publisher_url = $self->publisher_url();
+    my $license = $self->license()             || '';
+    my $license_date = $self->license_date()   || '';
+    my $description = $self->description()     || '';
+    my $subject = $self->subject()             || '';
+    my $publisher = $self->publisher()         || '';
+    my $publisher_url = $self->publisher_url() || '';
     my $language = 'en'; # TODO
 
     my $license_rdf = ''; 

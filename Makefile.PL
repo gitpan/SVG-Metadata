@@ -3,7 +3,14 @@ use ExtUtils::MakeMaker;
 my %opts = (
 	    'NAME'	   => 'SVG::Metadata',
 	    'VERSION_FROM' => qw( lib/SVG/Metadata.pm ),
-	    'EXE_FILES' => [ qw( scripts/validate_svg ) ],
+	    'EXE_FILES' => [ qw( 
+				 scripts/cleanup_clipart
+				 scripts/package_clipart
+				 scripts/retrieve_clipart
+				 scripts/svg_annotate
+				 scripts/svg_validate
+				 scripts/unpack_clipart
+				 ) ],
 	    'PREREQ_PM' => { 
 		'Pod::Usage'     => 1.14,
 		'Getopt::Long'   => 2.25,

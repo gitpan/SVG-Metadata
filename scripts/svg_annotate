@@ -47,6 +47,7 @@ pod2usage(-verbose => 1, -exitstatus => 0) if (@ARGV<1);
 
 my $Annote_meta;
 
+# Executes program and returns error code
 sub main {
     $opt_author ||= 'Bryce Harrington';
     $opt_owner  ||= $opt_author;
@@ -81,7 +82,7 @@ sub main {
 	find({ wanted => \&wanted, no_chdir => 1}, @search_dirs);
     }
 
-    return 1;
+    return 0;
 }
 
 sub process_file {
@@ -285,17 +286,17 @@ to the debug message verbosity.
 Specifies the name of the author to use for the RDF.  Remember to use quotes if
 you wish to specify a multi-word name.  E.g., --author="Bryce W. Harrington".
 
-=item B<-a> I<owner>, B<--owner>=I<owner>
+=item B<-o> I<owner>, B<--owner>=I<owner>
 
 The owner for the file.  Typically the same as the author.
 
-=item B<-a> I<license>, B<--license>=I<license>
+=item B<-l> I<license>, B<--license>=I<license>
 
 The license URL to use for the file.  See the Creative Common's site for
 typical licenses.  By default it uses the Public Domain license, 
 --license="http://web.resource.org/cc/PublicDomain".
 
-=item B<-a> I<title>, B<--title>=I<title>
+=item B<-t> I<title>, B<--title>=I<title>
 
 The title to use for all the indicated files.  Note that several fill-in
 parameters are included, for a little dynamism (see DESCRIPTION, above).

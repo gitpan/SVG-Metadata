@@ -77,7 +77,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 
 use fields qw(
@@ -148,6 +148,37 @@ sub author {
     my $self = shift;
     return $self->creator(@_);
 }
+
+=head2 keywords_to_rdf()
+
+Generates an rdf:Bag based on the data structure of keywords.
+This can then be used to populate the subject section of the metadata.
+I.e.:
+
+    $svgobj->subject($svg->keywords_to_rdf());
+
+See:
+  http://www.w3.org/TR/rdf-schema/#ch_bag
+  http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-list-element
+  http://dublincore.org/documents/2002/05/15/dcq-rdf-xml/#sec2
+
+=cut
+sub keywords_to_rdf {
+    my $self = shift;
+    
+    my $text = '';
+
+    foreach my $keyword ($self->keywords()) {
+	$text .= "            <rdf:li>$keyword</rdf:li>\n";
+    }
+
+    if ($text ne '') {
+	return "          <rdf:Bag>\n$text          </rdf:Bag>";
+    } else {
+	return '';
+    }
+}
+
 
 =head2 errormsg()
 
@@ -267,7 +298,6 @@ sub parse {
     $self->{_owner_url}     = ''; # TODO
     $self->{_license}       = _get_content($work->{'cc:license'}->{'rdf:resource'}) || '';
     $self->{_license_date}  = ''; # TODO
-    $self->{_keywords}      = {}; # TODO
     $self->{_language}      = 'en'; # TODO
 
     $self->{_creator}       ||= $self->{_owner};
@@ -276,6 +306,13 @@ sub parse {
     $self->{_owner_url}     ||= $self->{_creator_url};
     $self->{_publisher}     ||= $self->{_owner};
     $self->{_publisher_url} ||= $self->{_owner_url};
+
+    if ($self->{_subject} && defined $self->{_subject}->{'rdf:Bag'}) {
+	$self->{_keywords}      = @{_get_content($work->{'dc:subject'}->{'rdf:Bag'})};
+	$self->{_subject}       = undef;
+    } else {
+	$self->{_keywords} = undef;
+    }
 
     return 1;
 }
@@ -303,7 +340,10 @@ Gets or sets the description
 
 =head2 subject()
 
-Gets or sets the subject
+Gets or sets the subject.  Note that the parse() routine pulls the
+keywords out of the subject and places them in the keywords collection,
+so subject() will normally return undef.  If you assign to subject() it
+will override the internal keywords() mechanism.
 
 =head2 publisher()
 
@@ -363,7 +403,6 @@ two-letter lettercodes, such as 'en', etc.
 Gets or sets the strict validation option.  
 
 =cut
-
 
 
 =head2 keywords()
@@ -476,9 +515,9 @@ sub to_text {
     my $self = shift;
 
     my $text = '';
-    $text .= 'Title:    ' . $self->title() . "\n";
-    $text .= 'Author:   ' . $self->author() . "\n";
-    $text .= 'License:  ' . $self->license() . "\n";
+    $text .= 'Title:    ' . ($self->title()||'') . "\n";
+    $text .= 'Author:   ' . ($self->author()||'') . "\n";
+    $text .= 'License:  ' . ($self->license()||'') . "\n";
     $text .= 'Keywords: ';
     $text .= join("\n          ", $self->keywords());
     $text .= "\n";
@@ -497,22 +536,22 @@ character.
 sub to_rdf {
     my $self = shift;
 
-    my $about_url = ''; # TODO
-    my $title   = $self->title()               || '';
-    my $creator = $self->creator()             || '';
-    my $creator_url = $self->creator_url()     || '';
-    my $owner   = $self->owner()               || '';
-    my $owner_url = $self->owner_url()         || '';
-    my $date    = ''; # TODO
-    my $license = $self->license()             || '';
-    my $license_date = $self->license_date()   || '';
-    my $description = $self->description()     || '';
-    my $subject = $self->subject()             || '';
-    my $publisher = $self->publisher()         || '';
+    my $about_url     = ''; # TODO
+    my $title         = $self->title()               || '';
+    my $creator       = $self->creator()             || '';
+    my $creator_url   = $self->creator_url()     || '';
+    my $owner         = $self->owner()               || '';
+    my $owner_url     = $self->owner_url()         || '';
+    my $date          = ''; # TODO
+    my $license       = $self->license()             || '';
+    my $license_date  = $self->license_date()   || '';
+    my $description   = $self->description()     || '';
+    my $subject       = $self->subject()             || $self->keywords_to_rdf();
+    my $publisher     = $self->publisher()         || '';
     my $publisher_url = $self->publisher_url() || '';
-    my $language = 'en'; # TODO
+    my $language      = 'en'; # TODO
 
-    my $license_rdf = ''; 
+    my $license_rdf   = ''; 
     if ($license eq 'Public Domain'
 	or $license eq 'http://web.resource.org/cc/PublicDomain') {
 	$license_rdf = qq(
@@ -534,7 +573,9 @@ sub to_rdf {
       <Work rdf:about="$about_url">
         <dc:title>$title</dc:title>
 	<dc:description>$description</dc:description>
-        <dc:subject>$subject</dc:subject>
+        <dc:subject>
+$subject
+        </dc:subject>
         <dc:publisher>
            <Agent rdf:about="$publisher_url">
              <dc:title>$publisher</dc:title>

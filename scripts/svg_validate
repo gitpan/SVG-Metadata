@@ -199,7 +199,7 @@ sub process_file {
     my $retval = 1;
     my $svgmeta = new SVG::Metadata;
 
-    my ($fn,$dir,$ext)  = fileparse($filename, '\..*?');
+    my ($fn,$dir,$ext)  = fileparse($filename, qr{\.[^\.]*?});
     $ext =~ s|^\.||;
     my $pngname = $fn.'.png';
     my $metaname = $fn.".txt";

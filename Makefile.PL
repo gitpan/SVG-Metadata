@@ -2,7 +2,7 @@ use ExtUtils::MakeMaker;
 #
 my %opts = (
 	    'NAME'	   => 'SVG::Metadata',
-	    'VERSION_FROM' => qw( lib/SVG/Metadata.pm ),
+	    'VERSION_FROM' => "lib/SVG/Metadata.pm",
 	    'EXE_FILES' => [ qw( 
 				 scripts/cleanup_clipart
 				 scripts/package_clipart

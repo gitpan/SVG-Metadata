@@ -9,10 +9,13 @@
 #   * Create an HTML indexpage
 #   * Switch to using Carp instead of print/warn
 #   * Autogenerate the AUTHORS file
-#   * Add keyword support (review RDF)
+#   * (DONE) Add keyword support (review RDF)
 #   * Upload to Inkscape file tracker
 #   * Add support for the style of metadata at http://www.w3.org/TR/2003/REC-SVG11-20030114/metadata.html 
 #   * Reuse dnote from stat_collector.pl
+#   * Change to use svg2png instead of inkscape, when possible
+#   * Don't bother creating duplicate thumbnails when copying image to 
+#     several categories
 
 # pngcrush:
 # pngcrush -text b "Copyright" \
@@ -45,6 +48,7 @@ our $opt_help       = 0;
 our $opt_man        = 0;
 our $opt_debug      = 0;
 our $opt_noclobber  = 0;  # Prevent script from overwriting existing files
+our $opt_passfail   = 0;
 our $opt_target_dir = 'default-0.00';
 
 Getopt::Long::Configure ("bundling", "no_ignore_case");
@@ -55,6 +59,7 @@ GetOptions(
 	   "debug|D=i",      # Prints debug messages
 	   "noclobber|n",    # Sets script to not overwrite existing files
 	   "target_dir|t=s", # Specifies where files should be placed
+	   "passfail",       # Just create passfail file.
            ) or pod2usage(-verbose => 1, -exitstatus => 0);
 
 if ($opt_version) {
@@ -150,8 +155,9 @@ sub create_png {
 	}
     }
 
-    print "Calling 'inkscape -f $filename -e $pngname -w 80'\n";
-    print `inkscape -f $filename -e $pngname -w 80`;
+    my $cmd = "inkscape -f \"$filename\" -e \"$pngname\" -w 80";
+    print "Calling '$cmd'\n";
+    print `$cmd`;
 
     if ($?) {
 	warn "Inkscape returned error:  ".($?/256)."\n";
@@ -255,8 +261,13 @@ sub process_file {
 	return $retval;
     }
 
-    # Copy it to the target directory
-    foreach my $category ($svgmeta->keywords()) {
+    if ($opt_passfail) {
+      # just show some progress
+      print "$filename\n";
+    } else {
+
+      # Copy it to the target directory
+      foreach my $category ($svgmeta->keywords()) {
 	my $d = catdir($target_dir, $category);
 
 	eval { mkpath([$d], 0, 0755) };
@@ -287,6 +298,7 @@ sub process_file {
 	} else {
 	    $Results->{$fn}->{render} = "PASS";
 	}
+      }
     }
 
     print " File produced return value '$retval'\n" if $opt_debug>1;
@@ -313,6 +325,7 @@ svg_validate [OPTIONS] subdir1[, subdir2...]
  -D, --debug=N     Reports debugging info (1=sparse, 3=tons)
  -n, --noclobber   Don't overwrite existing files
  -t, --target_dir  Specifies where files should be placed
+     --passfail    Just generate the passfail file (still buggy)
 
 
 =head1 DESCRIPTION
@@ -359,6 +372,11 @@ metadata.  The files will be grouped into a subdirectory tree based on
 keywords.
 
 The default target directory is 'default-0.00'.
+
+=item B<--passfail>
+
+This option allows you to skip generating the thumbnails and only
+produce the passfail report.
 
 =back
 

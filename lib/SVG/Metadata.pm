@@ -72,14 +72,13 @@ use strict;
 use warnings;
 use XML::Twig;
 
-
-use vars qw($VERSION @ISA);
+# use Data::Dumper;
 
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 
 use fields qw(
@@ -309,14 +308,19 @@ sub parse {
     $self->{_publisher}     ||= $self->{_owner};
     $self->{_publisher_url} ||= $self->{_owner_url};
 
-    if ($self->{_subject} && ref $self->{_subject} eq 'HASH' && 
-	defined $self->{_subject}->{'rdf:Bag'}) {
-        if (ref $subjectwords) { # Multiple keywords
+    if ($self->{_subject} &&
+	ref $self->{_subject} eq 'HASH' &&
+	defined $self->{_subject}->{'rdf:Bag'} &&
+	ref $self->{_subject}->{'rdf:Bag'} eq 'HASH' &&
+	defined $self->{_subject}->{'rdf:Bag'}->{'rdf:li'}) {
+
+	my $subjectwords = _get_content($self->{_subject}->{'rdf:Bag'}->{'rdf:li'});
+	if (ref $subjectwords) { # Multiple keywords
 	    $self->{_keywords} = { map { $_=>1 } @$subjectwords };
-        } else { # Only one keyword
+	} else { # Only one keyword
 	    $self->{_keywords} = { $subjectwords => 1 } ;
-        }
-	$self->{_subject}       = undef;
+	}
+	$self->{_subject} = undef;
     } else {
 	$self->{_keywords} = { unsorted => 1 };
     }
@@ -330,8 +334,12 @@ sub parse {
 sub _get_content {
     my ($content)=@_;
 
-    return $content->{'content'} if (UNIVERSAL::isa($content,"HASH"));
-    return $content;
+    if (UNIVERSAL::isa($content,"HASH")
+	&& exists($content->{'content'})) {
+	return $content->{'content'};
+    } else {
+	return $content;
+    }
 }
 
 =head2 title()

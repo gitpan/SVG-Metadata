@@ -79,7 +79,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 
 use fields qw(
@@ -169,14 +169,13 @@ sub keywords_to_rdf {
     my $self = shift;
     
     my $text = '';
-
     foreach my $keyword ($self->keywords()) {
 	$keyword = $self->esc_ents($keyword);
-	$text .= "            <rdf:li>$keyword</rdf:li>\n";
+	$text .= qq(            <rdf:li>$keyword</rdf:li>\n);
     }
 
     if ($text ne '') {
-	return "          <rdf:Bag>\n$text          </rdf:Bag>";
+	return qq(          <rdf:Bag>\n$text          </rdf:Bag>);
     } else {
 	return '';
     }
@@ -297,7 +296,7 @@ sub parse {
     $self->{_title}         = _get_content($work->{'dc:title'}) || '';
     $self->{_description}   = _get_content($work->{'dc:description'}) || '';
     $self->{_subject}       = _get_content($work->{'dc:subject'}) || '';
-    $self->{_publisher}     = _get_content($work->{'dc:publisher'}) || '';
+    $self->{_publisher}     = _get_content($work->{'dc:publisher'}->{'dc:Agent'}->{'dc:title'}) || '';
     $self->{_publisher_url} = 'http://www.openclipart.org'; # TODO
     $self->{_creator}       = _get_content($work->{'dc:creator'}->{'cc:Agent'}->{'dc:title'}) || '';
     $self->{_creator_url}   = ''; # TODO
@@ -327,16 +326,6 @@ sub parse {
 	    $self->{_keywords} = { $subjectwords => 1 } ;
 	}
 	$self->{_subject} = undef;
-    } elsif ($self->{_subject}) {
-        # Inkscape gives the user a single text input for this and
-        # does no parsing, so we're liable to get keywords separated
-        # by commas, semicolons, colons, spaces, ...  This is our
-        # attempt to do the best we can with that:  we'll split on
-        # non-word characters except for hyphen and apostrophe:
-        $self->{_keywords} = { map { $_=>1 } grep { not /\A\s*\Z/ }
-                               'improvisedkeywordparse',
-                               split /(?![-'])\W+/, $self->{_subject} };
-        $self->{_subject} = undef;
     } else {
 	$self->{_keywords} = { unsorted => 1 };
     }
@@ -592,7 +581,7 @@ sub to_rdf {
     my $license       = $self->esc_ents($self->license())         || '';
     my $license_date  = $self->esc_ents($self->license_date())    || '';
     my $description   = $self->esc_ents($self->description())     || '';
-    my $subject       = $self->esc_ents($self->subject())         || $self->keywords_to_rdf();
+    my $subject       = $self->keywords_to_rdf() || '';
     my $publisher     = $self->esc_ents($self->publisher())       || '';
     my $publisher_url = $self->esc_ents($self->publisher_url())   || '';
     my $language      = 'en'; # TODO
@@ -662,7 +651,7 @@ C<XML::Twig>
 
 =head1 AUTHOR
 
-Bryce Harrington <bryce@bryceharrington.com>
+Bryce Harrington <bryce@bryceharrington.org>
 
 =head1 COPYRIGHT
                                                                                 

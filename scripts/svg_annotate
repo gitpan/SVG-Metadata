@@ -17,10 +17,11 @@ my $opt_version      = 0;
 my $opt_help         = 0;
 my $opt_man          = 0;
 my $opt_debug        = 1;
+my $opt_edit         = 0;
 my $opt_author       = '';
 my $opt_owner        = '';
-my $opt_license      = 'http://web.resource.org/cc/PublicDomain';
-my $opt_title        = 'Clipart by <AUTHOR> - <FILEBASE>';
+my $opt_license      = '';
+my $opt_title        = '';
 my @opt_keyword      = ();
 my $opt_delete       = 0;
 
@@ -32,6 +33,7 @@ GetOptions(
            "help|h"      => \$opt_help,      # Prints a brief help message
            "man"         => \$opt_man,       # Prints extended help
 	   "debug|D=i"   => \$opt_debug,     # Prints debug messages
+	   "edit|e"      => \$opt_edit,      # Edit mode
 	   "author|a=s"  => \$opt_author,
 	   "owner|o=s"   => \$opt_owner,
 	   "license|l=s" => \$opt_license,
@@ -76,6 +78,8 @@ sub main {
 	} elsif (-f $file) {
 	    if ($opt_delete) {
 		remove_rdf($file);
+	    } elsif ($opt_edit) {
+		edit_rdf($file, $Annote_meta);
 	    } else {
 		process_file($file, $Annote_meta)
 		    or warn "Could not process $file\n";
@@ -87,8 +91,12 @@ sub main {
 	if (!-d && /\.svg$/) {
 	    if ($opt_delete) {
 		remove_rdf($File::Find::name);
+
+	    } elsif ($opt_edit) {
+		edit_rdf($File::Find::name, $Annote_meta);
 	    } else {
 		process_file($File::Find::name, $Annote_meta);
+
 	    }
 	}
     }
@@ -100,11 +108,56 @@ sub main {
     return 0;
 }
 
+sub edit_rdf {
+    my $filename = shift;
+    my $new_meta = shift;
+    my $meta = new SVG::Metadata;
+
+    # Load up current RDF
+    if (!$meta->parse($filename)) {
+	warn "Could not parse metadata from '$filename'\n";
+    } elsif ($opt_debug>3) {
+	warn "Loaded up metadata from '$filename'\n";
+    }
+    # Edit it
+    if ($new_meta->title()) {
+	$meta->title($new_meta->title());
+	warn "Replacing title with ".$new_meta->title()."\n" 
+	    if $opt_debug>3;
+    }
+    if ($new_meta->author()) {
+	$meta->author($new_meta->author());
+	warn "Replacing author with ".$new_meta->author()."\n"
+	    if $opt_debug>3;
+    }
+    if ($new_meta->owner()) {
+	$meta->owner($new_meta->owner());
+	warn "Replacing owner with ".$new_meta->owner()."\n" 
+	    if $opt_debug>3;
+    }
+    if ($new_meta->keywords()) {
+	$meta->addKeyword($new_meta->keywords());
+	warn "Adding keywords with ".join(',',$new_meta->keywords())."\n" 
+	    if $opt_debug>3;
+    }
+    if ($new_meta->license()) {
+	$meta->license($new_meta->license());
+	warn "Replacing license with ".$new_meta->license()."\n" 
+	    if $opt_debug>3;
+    }
+    # Remove it
+    if (!remove_rdf($filename)) {
+	warn "Could not replace the RDF from '$filename'... aborting\n";
+    }
+    # Save it
+    process_file($filename, $meta);
+}
+
 sub process_file {
     my $file = shift;
     my $svgmeta = shift || die "No svgmeta object passed to process_file\n";
 
-    my $title = $svgmeta->title();
+    my $title = $svgmeta->title() || '<FILEBASE>';
 
     warn "Processing file '$file'\n" if $opt_debug>0;
 
@@ -143,6 +196,7 @@ sub process_file {
 	if (m|</svg>| && ! $seen_rdf) {
 	    my $orig_title = $svgmeta->title();
 	    $svgmeta->title($title);
+	    print "Printing the rdf\n";
 	    print NEWSVGFILE $svgmeta->to_rdf();
 	    $svgmeta->title($orig_title);
 	} elsif (m|</rdf:RDF>|i or m|</rdf>|i) {
@@ -187,6 +241,7 @@ sub remove_rdf {
     }
 
     # Undef newline as line separator so the read is the whole file
+    my $tmp = $/;
     undef $/;
     while (<OLDSVGFILE>) {
 	$_ =~ s|<metadata.*?</metadata>||gs;
@@ -194,6 +249,7 @@ sub remove_rdf {
 	$_ =~ s|<rdf.*?</rdf>||gs;
 	print NEWSVGFILE $_;
     }
+    $/ = $tmp;
 
     close(OLDSVGFILE) or warn "Could not close '$file': $!\n";
     close(NEWSVGFILE) or warn "Could not close '$file': $!\n";
@@ -373,9 +429,9 @@ L<SVG::Metadata>, L<inkscape>, L<XML::Twig>
 
 =head1 AUTHOR
 
-Bryce Harrington E<lt>bryce@bryceharrington.comE<gt>
+Bryce Harrington E<lt>bryce@bryceharrington.orgE<gt>
 
-L<http://www.bryceharrington.com/|http://www.bryceharrington.com/>
+L<http://www.bryceharrington.org/|http://www.bryceharrington.org/>
 
 =head1 COPYRIGHT
 

@@ -26,7 +26,7 @@ my %opts = (
 	    );
 
 if ($ExtUtils::MakeMaker::VERSION >= 5.43) {
-    $opts{AUTHOR}   = 'Bryce Harrington <bryce@bryceharrington.com>';
+    $opts{AUTHOR}   = 'Bryce Harrington <bryce@bryceharrington.org>';
     $opts{ABSTRACT} = 'Parsing and validating RDF metadata in SVG files';
 }
  

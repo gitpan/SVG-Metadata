@@ -1,3 +1,11 @@
+2005-02-07 23:00  bryce
+
+	* lib/SVG/Metadata.pm:  Corrected a few bugs in the printing of
+	  keywords in emitted RDF.  Fixed problem with parsing publisher
+	  information. 
+	* scripts/svg_annotate:  Added -e flag for editing metadata.
+	  Fiddled with how keywords are edited a little.
+
 2004-10-17 23:00  bryce
 
 	* lib/SVG/Metadata.pm:  Switching to use of HTML::Entities

@@ -78,7 +78,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 
 use fields qw(
@@ -321,6 +321,16 @@ sub parse {
 	    $self->{_keywords} = { $subjectwords => 1 } ;
 	}
 	$self->{_subject} = undef;
+    } elsif ($self->{_subject}) {
+        # Inkscape gives the user a single text input for this and
+        # does no parsing, so we're liable to get keywords separated
+        # by commas, semicolons, colons, spaces, ...  This is our
+        # attempt to do the best we can with that:  we'll split on
+        # non-word characters except for hyphen and apostrophe:
+        $self->{_keywords} = { map { $_=>1 } grep { not /\A\s*\Z/ }
+                               'improvisedkeywordparse',
+                               split /(?![-'])\W+/, $self->{_subject} };
+        $self->{_subject} = undef;
     } else {
 	$self->{_keywords} = { unsorted => 1 };
     }

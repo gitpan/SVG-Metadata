@@ -173,7 +173,7 @@ sub passfail_report {
 
     $text .= sprintf("%-40s Parse Title Authr Lcnse Kywds\n", 'Filename');
     $text .= ('-'x70) . "\n";
-    foreach my $fn (keys %{$results}) {
+    foreach my $fn (sort keys %{$results}) {
 	$text .= sprintf("%-40s   ", $fn.'.svg');
 	foreach my $field (qw(parse title authorship license keywords)) {
 	    my $result = $results->{$fn}->{$field};

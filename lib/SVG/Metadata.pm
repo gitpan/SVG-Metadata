@@ -77,7 +77,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 
 use fields qw(
@@ -269,6 +269,13 @@ sub parse {
     $self->{_license_date}  = ''; # TODO
     $self->{_keywords}      = {}; # TODO
     $self->{_language}      = 'en'; # TODO
+
+    $self->{_creator}       ||= $self->{_owner};
+    $self->{_creator_url}   ||= $self->{_owner_url};
+    $self->{_owner}         ||= $self->{_creator};
+    $self->{_owner_url}     ||= $self->{_creator_url};
+    $self->{_publisher}     ||= $self->{_owner};
+    $self->{_publisher_url} ||= $self->{_owner_url};
 
     return 1;
 }

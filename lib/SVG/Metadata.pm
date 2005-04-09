@@ -79,7 +79,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 
 use fields qw(
@@ -88,17 +88,17 @@ use fields qw(
               _subject
               _publisher
               _publisher_url
-	      _creator
-	      _creator_url
-	      _owner
-	      _owner_url
-	      _license
+              _creator
+              _creator_url
+              _owner
+              _owner_url
+              _license
               _license_date
               _keywords
               _language
               _ERRORMSG
               _strict_validation
-	      );
+              );
 use vars qw( %FIELDS $AUTOLOAD );
 
 
@@ -119,8 +119,8 @@ sub new {
     my $self = bless [\%FIELDS], $class;
 
     while (my ($field, $value) = each %args) {
-	$self->{"_$field"} = $value
-	    if (exists $FIELDS{"_$field"});
+        $self->{"_$field"} = $value
+            if (exists $FIELDS{"_$field"});
     }
     $self->{_creator}         ||= $args{author} || '';
     $self->{_language}        ||= 'en';
@@ -170,14 +170,14 @@ sub keywords_to_rdf {
     
     my $text = '';
     foreach my $keyword ($self->keywords()) {
-	$keyword = $self->esc_ents($keyword);
-	$text .= qq(            <rdf:li>$keyword</rdf:li>\n);
+        $keyword = $self->esc_ents($keyword);
+        $text .= qq(            <rdf:li>$keyword</rdf:li>\n);
     }
 
     if ($text ne '') {
-	return qq(          <rdf:Bag>\n$text          </rdf:Bag>);
+        return qq(          <rdf:Bag>\n$text          </rdf:Bag>);
     } else {
-	return '';
+        return '';
     }
 }
 
@@ -228,69 +228,69 @@ sub parse {
     my $filename = shift;
 
     if (! defined($filename)) {
-	$self->{_ERRORMSG} = "No filename or text argument defined for parsing";
-	return undef;
+        $self->{_ERRORMSG} = "No filename or text argument defined for parsing";
+        return undef;
     }
 
     my $twig = XML::Twig->new( map_xmlns => {
-				'http://web.resource.org/cc/' => "cc",
-				'http://www.w3.org/1999/02/22-rdf-syntax-ns#' => "rdf",
-				'http://purl.org/dc/elements/1.1/' => "dc",
-				},
-			       pretty_print => 'indented',
-			);
+                                'http://web.resource.org/cc/' => "cc",
+                                'http://www.w3.org/1999/02/22-rdf-syntax-ns#' => "rdf",
+                                'http://purl.org/dc/elements/1.1/' => "dc",
+                                },
+                               pretty_print => 'indented',
+                        );
 
     if ($filename =~ m/\n.*\n/ || (ref $filename eq 'IO::Handle')) {
-	# Hmm, if it has newlines, it is likely to be a string instead of a filename
-	eval { $twig->parse($filename); };
+        # Hmm, if it has newlines, it is likely to be a string instead of a filename
+        eval { $twig->parse($filename); };
     } elsif ($filename =~ /^http/ or $filename =~ /^ftp/) {
-	eval { $twig->parseurl($filename); };
+        eval { $twig->parseurl($filename); };
     } elsif (! -e $filename) {
-	$self->{_ERRORMSG} = "Filename '$filename' does not exist";
-	return undef;
+        $self->{_ERRORMSG} = "Filename '$filename' does not exist";
+        return undef;
     } else {
-	eval { $twig->parsefile($filename); };
+        eval { $twig->parsefile($filename); };
     }
-	
+        
     if ($@) {
-	$self->{_ERRORMSG} = "Error parsing file:  $@";
-	return undef;
+        $self->{_ERRORMSG} = "Error parsing file:  $@";
+        return undef;
     }
 
     my $ref;
     eval {
-	$ref = $twig->simplify(); # forcecontent => 1);
+        $ref = $twig->simplify(); # forcecontent => 1);
     };
     return undef if ($@);
     
     if (! defined($ref)) {
-	$self->{_ERRORMSG} = "XML::Twig did not return a valid XML object";
-	return undef;
+        $self->{_ERRORMSG} = "XML::Twig did not return a valid XML object";
+        return undef;
     }
 
     my $metadata = $ref->{'metadata'} || $ref->{'#default:metadata'};
     my $rdf;
     if (! defined($metadata) ) {
-	$rdf = $ref->{'rdf:RDF'};
-	if (! defined($rdf)) {
-	    $self->{_ERRORMSG} = "No 'RDF' element found in document.";
-	    return undef;
-	} else {
-	    $self->{_ERRORMSG} = "'RDF' element not defined in a <metadata></metadata> block";
-	    return undef if ($self->{_strict_validation});
-	} 
+        $rdf = $ref->{'rdf:RDF'};
+        if (! defined($rdf)) {
+            $self->{_ERRORMSG} = "No 'RDF' element found in document.";
+            return undef;
+        } else {
+            $self->{_ERRORMSG} = "'RDF' element not defined in a <metadata></metadata> block";
+            return undef if ($self->{_strict_validation});
+        } 
     } else {
-	$rdf = $metadata->{'rdf:RDF'};
-	if (! defined($rdf)) {
-	    $self->{_ERRORMSG} = "No 'RDF' element found in the <metadata> element in the document.";
-	    return undef;
-	}
+        $rdf = $metadata->{'rdf:RDF'};
+        if (! defined($rdf)) {
+            $self->{_ERRORMSG} = "No 'RDF' element found in the <metadata> element in the document.";
+            return undef;
+        }
     }
 
     my $work = $rdf->{'cc:Work'};
     if (! defined($work)) {
-	$self->{_ERRORMSG} = "No 'Work' element found in the 'RDF' element";
-	return undef;
+        $self->{_ERRORMSG} = "No 'Work' element found in the 'RDF' element";
+        return undef;
     }
 
     $self->{_title}         = _get_content($work->{'dc:title'}) || '';
@@ -314,20 +314,20 @@ sub parse {
     $self->{_publisher_url} ||= $self->{_owner_url};
 
     if ($self->{_subject} &&
-	ref $self->{_subject} eq 'HASH' &&
-	defined $self->{_subject}->{'rdf:Bag'} &&
-	ref $self->{_subject}->{'rdf:Bag'} eq 'HASH' &&
-	defined $self->{_subject}->{'rdf:Bag'}->{'rdf:li'}) {
+        ref $self->{_subject} eq 'HASH' &&
+        defined $self->{_subject}->{'rdf:Bag'} &&
+        ref $self->{_subject}->{'rdf:Bag'} eq 'HASH' &&
+        defined $self->{_subject}->{'rdf:Bag'}->{'rdf:li'}) {
 
-	my $subjectwords = _get_content($self->{_subject}->{'rdf:Bag'}->{'rdf:li'});
-	if (ref $subjectwords) { # Multiple keywords
-	    $self->{_keywords} = { map { $_=>1 } @$subjectwords };
-	} else { # Only one keyword
-	    $self->{_keywords} = { $subjectwords => 1 } ;
-	}
-	$self->{_subject} = undef;
+        my $subjectwords = _get_content($self->{_subject}->{'rdf:Bag'}->{'rdf:li'});
+        if (ref $subjectwords) { # Multiple keywords
+            $self->{_keywords} = { map { $_=>1 } @$subjectwords };
+        } else { # Only one keyword
+            $self->{_keywords} = { $subjectwords => 1 } ;
+        }
+        $self->{_subject} = undef;
     } else {
-	$self->{_keywords} = { unsorted => 1 };
+        $self->{_keywords} = { unsorted => 1 };
     }
 
     return 1;
@@ -340,10 +340,10 @@ sub _get_content {
     my ($content)=@_;
 
     if (UNIVERSAL::isa($content,"HASH")
-	&& exists($content->{'content'})) {
-	return $content->{'content'};
+        && exists($content->{'content'})) {
+        return $content->{'content'};
     } else {
-	return $content;
+        return $content;
     }
 }
 
@@ -435,7 +435,7 @@ mechanism, and can be used, for example, to sort the files topically.
 sub keywords {
     my $self = shift;
     if (@_) {
-	$self->addKeyword(@_);
+        $self->addKeyword(@_);
     }
     return undef unless defined($self->{_keywords});
 
@@ -456,7 +456,7 @@ internally as a set, so only one copy of a given keyword will be stored.
 sub addKeyword {
     my $self = shift;
     foreach my $new_keyword (@_) {
-	$self->{_keywords}->{$new_keyword} = 1;
+        $self->{_keywords}->{$new_keyword} = 1;
     }
 }
 
@@ -509,9 +509,9 @@ sub compare {
     my $meta = shift;
 
     return ( $meta->author() eq $self->author() &&
-	     $meta->title() eq $self->title() &&
-	     $meta->license() eq $self->license()
-	     );
+             $meta->title() eq $self->title() &&
+             $meta->license() eq $self->license()
+             );
 }
 
 
@@ -588,17 +588,93 @@ sub to_rdf {
 
     my $license_rdf   = ''; 
     if ($license eq 'Public Domain'
-	or $license eq 'http://web.resource.org/cc/PublicDomain') {
-	$license_rdf = qq(
+        or $license eq 'http://web.resource.org/cc/PublicDomain') {
+        $license = "http://web.resource.org/cc/PublicDomain";
+        $license_rdf = qq(
       <License rdf:about="$license">
          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
          <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
       </License>
-
+);
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc-nd/2.0/') {
+        $license_rdf = qq(
+     <License rdf:about="http://creativecommons.org/licenses/by-nc-nd/2.0/">
+          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+          <requires rdf:resource="http://web.resource.org/cc/Notice" />
+          <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+          <prohibits rdf:resource="http://web.resource.org/cc/CommercialUse" />
+     </License>
+);
+    } elsif ($license eq 'http://creativecommons.org/licenses/by/2.0/') {
+        $license_rdf = qq(
+     <License rdf:about="http://creativecommons.org/licenses/by/2.0/">
+          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+          <requires rdf:resource="http://web.resource.org/cc/Notice" />
+          <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+          <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+     </License>
+);
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc/2.0/') {
+        $license_rdf = qq(
+     <License rdf:about="http://creativecommons.org/licenses/by-nc/2.0/">
+          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+          <requires rdf:resource="http://web.resource.org/cc/Notice" />
+          <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+          <prohibits rdf:resource="http://web.resource.org/cc/CommercialUse" />
+          <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+     </License>
+);
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nd/2.0/') { 
+        $license_rdf = qq(
+     <License rdf:about="http://creativecommons.org/licenses/by-nd/2.0/">
+          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+          <requires rdf:resource="http://web.resource.org/cc/Notice" />
+          <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+     </License>
+);
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc-nd/2.0/') { 
+        $license_rdf = qq(
+     <License rdf:about="http://creativecommons.org/licenses/by-nc-nd/2.0/">
+          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+          <requires rdf:resource="http://web.resource.org/cc/Notice" />
+          <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+          <prohibits rdf:resource="http://web.resource.org/cc/CommercialUse" />
+     </License>
+);
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc-sa/2.0/') { 
+        $license_rdf = qq(
+     <License rdf:about="http://creativecommons.org/licenses/by-nc-sa/2.0/">
+          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+          <requires rdf:resource="http://web.resource.org/cc/Notice" />
+          <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+          <prohibits rdf:resource="http://web.resource.org/cc/CommercialUse" />
+          <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+          <requires rdf:resource="http://web.resource.org/cc/ShareAlike" />
+     </License>
+);
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-sa/2.0/') { 
+        $license_rdf = qq(
+     <License rdf:about="http://creativecommons.org/licenses/by-sa/2.0/">
+          <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+          <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+          <requires rdf:resource="http://web.resource.org/cc/Notice" />
+          <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+          <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+          <requires rdf:resource="http://web.resource.org/cc/ShareAlike" />
+     </License>
 );
     }
 
+    my $pub_data = ($publisher_url ? ' rdf:about="'.$publisher_url.'"' : '');
+    my $creator_data = ($creator_url ? ' rdf:about="'.$creator_url.'"' : '');
+    my $owner_data = ($owner_url ? ' rdf:about="'.$owner_url.'"' : '');
     return qq(
   <metadata>
     <rdf:RDF 
@@ -607,31 +683,29 @@ sub to_rdf {
      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
       <Work rdf:about="$about_url">
         <dc:title>$title</dc:title>
-	<dc:description>$description</dc:description>
+        <dc:description>$description</dc:description>
         <dc:subject>
 $subject
         </dc:subject>
         <dc:publisher>
-           <Agent rdf:about="$publisher_url">
+           <Agent$pub_data>
              <dc:title>$publisher</dc:title>
            </Agent>
          </dc:publisher>
          <dc:creator>
-           <Agent rdf:about="$creator_url">
+           <Agent$creator_data>
              <dc:title>$creator</dc:title>
            </Agent>
         </dc:creator>
          <dc:rights>
-           <Agent rdf:about="$owner_url">
+           <Agent$owner_data>
              <dc:title>$owner</dc:title>
            </Agent>
         </dc:rights>
         <dc:date>$date</dc:date>
         <dc:format>image/svg+xml</dc:format>
         <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <license rdf:resource="$license">
-	  <dc:date>$license_date</dc:date>
-	</license>
+        <license rdf:resource="$license" />
         <dc:language>$language</dc:language>
       </Work>
 $license_rdf

@@ -79,7 +79,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 
 use fields qw(
@@ -557,7 +557,7 @@ sub esc_ents {
     my $text = shift;
     return $text unless $text;
 
-    return encode_entities($text);
+    return encode_entities($text, qq(<>&"'));
 }
 
 =head2 to_rdf()

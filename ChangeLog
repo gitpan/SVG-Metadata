@@ -1,3 +1,7 @@
+2005-04-09 Stephen Silver
+
+	* Fix to encode_entities() call to only encode <>&'"
+
 2005-04-09 crschmidt
 
 	* lib/SVG/Metadata.pm:  Fixing tabs, improving RDF generation.

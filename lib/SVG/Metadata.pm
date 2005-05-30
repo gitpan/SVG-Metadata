@@ -8,7 +8,7 @@ SVG::Metadata - Perl module to capture metadata info about an SVG file
 
  my $svgmeta = new SVG::Metadata;
 
- $svgmeta->parse($filename) 
+ $svgmeta->parse($filename)
      or die "Could not parse $filename: " . $svgmeta->errormsg();
  $svgmeta2->parse($filename2)
      or die "Could not parse $filename: " . $svgmeta->errormsg();
@@ -79,7 +79,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.25';
 
 
 use fields qw(
@@ -96,8 +96,12 @@ use fields qw(
               _license_date
               _keywords
               _language
+              _about_url
+              _date
               _ERRORMSG
               _strict_validation
+              _retained_xml
+              _retained_declaration
               );
 use vars qw( %FIELDS $AUTOLOAD );
 
@@ -206,14 +210,14 @@ Extracts RDF metadata out of an existing SVG file.
 This routine looks for a field in the rdf:RDF section of the document
 named 'ns:Work' and then attempts to load the following keys from it:
 'dc:title', 'dc:rights'->'ns:Agent', and 'ns:license'.  If any are
-missing, it 
+missing, it
 
 The $filename parameter can be a filename, or a text string containing
 the XML to parse, or an open 'IO::Handle', or a URL.
 
-Returns undef if there was a problem parsing the file, and sets an 
+Returns undef if there was a problem parsing the file, and sets an
 error message appropriately.  The conditions under which it will return
-undef are as follows:  
+undef are as follows:
 
    * No 'filename' parameter given.
    * Filename does not exist.
@@ -221,11 +225,16 @@ undef are as follows:
    * No rdf:RDF element was found in the document.
    * The rdf:RDF element did not have a ns:Work sub-element
 
+Options:
+   retain_xml  - keep the SVG around so that to_svg will work later.
+       This may be called as follows:
+           parse($filename, retain_xml => 1)
+
 =cut
 
 sub parse {
-    my $self = shift;
-    my $filename = shift;
+    my ($self, $filename, %optn) = @_;
+    my $retaindecl;
 
     if (! defined($filename)) {
         $self->{_ERRORMSG} = "No filename or text argument defined for parsing";
@@ -236,22 +245,35 @@ sub parse {
                                 'http://web.resource.org/cc/' => "cc",
                                 'http://www.w3.org/1999/02/22-rdf-syntax-ns#' => "rdf",
                                 'http://purl.org/dc/elements/1.1/' => "dc",
+                                'http://www.w3.org/2000/svg' => "svg",
                                 },
                                pretty_print => 'indented',
+                               comments     => 'keep',
+                               pi           => 'keep',
+                               keep_original_prefix => 1,
                         );
 
     if ($filename =~ m/\n.*\n/ || (ref $filename eq 'IO::Handle')) {
         # Hmm, if it has newlines, it is likely to be a string instead of a filename
-        eval { $twig->parse($filename); };
+        eval { $twig->parse($filename);
+               if ($optn{retain_xml}) {
+                 ($retaindecl) = $filename =~ /(.*?)(<svg|<!-- Created|$)/is; # an inexact science
+               }};
     } elsif ($filename =~ /^http/ or $filename =~ /^ftp/) {
         eval { $twig->parseurl($filename); };
+        # TODO: retain declaration here too, if $optn{retain_xml} is set.
     } elsif (! -e $filename) {
         $self->{_ERRORMSG} = "Filename '$filename' does not exist";
         return undef;
     } else {
-        eval { $twig->parsefile($filename); };
+        eval { $twig->parsefile($filename);
+               if ($optn{retain_xml}) {
+                 open SVGIN, '<', $filename;
+                 local $/ = '<svg'; my $raw = <SVGIN>; close SVGIN;
+                 ($retaindecl) = $raw =~ /(.*?)(<svg|<!-- Created|$)/is; # an inexact science
+               }};
     }
-        
+
     if ($@) {
         $self->{_ERRORMSG} = "Error parsing file:  $@";
         return undef;
@@ -262,29 +284,26 @@ sub parse {
         $ref = $twig->simplify(); # forcecontent => 1);
     };
     return undef if ($@);
-    
+
     if (! defined($ref)) {
         $self->{_ERRORMSG} = "XML::Twig did not return a valid XML object";
         return undef;
     }
 
-    my $metadata = $ref->{'metadata'} || $ref->{'#default:metadata'};
     my $rdf;
-    if (! defined($metadata) ) {
-        $rdf = $ref->{'rdf:RDF'};
-        if (! defined($rdf)) {
-            $self->{_ERRORMSG} = "No 'RDF' element found in document.";
-            return undef;
-        } else {
-            $self->{_ERRORMSG} = "'RDF' element not defined in a <metadata></metadata> block";
-            return undef if ($self->{_strict_validation});
-        } 
+    my $metadata = $ref->{'metadata'} || $ref->{'#default:metadata'} || $ref->{'svg:metadata'};
+    if (defined $metadata) {
+      $rdf = $metadata->{'rdf:RDF'} || $metadata->{RDF} || $metadata->{rdf};
     } else {
-        $rdf = $metadata->{'rdf:RDF'};
-        if (! defined($rdf)) {
-            $self->{_ERRORMSG} = "No 'RDF' element found in the <metadata> element in the document.";
-            return undef;
-        }
+      $rdf = $ref->{'rdf:RDF'} || $ref->{RDF} || $ref->{rdf};
+    }
+    if (not defined $rdf) {
+      $self->{_ERRORMSG} = "No 'RDF' element found in " .
+        ((defined $metadata) ? "metadata element" : "document");
+      return undef;
+    } elsif ($self->{_strict_validation} and not defined $metadata) {
+      $self->{_ERRORMSG} = "'RDF' element not contained in a <metadata></metadata> block";
+      return undef;
     }
 
     my $work = $rdf->{'cc:Work'};
@@ -292,6 +311,32 @@ sub parse {
         $self->{_ERRORMSG} = "No 'Work' element found in the 'RDF' element";
         return undef;
     }
+
+    my $getagent = sub {
+      my ($elt) = shift; return unless ref $elt;
+      my $a = $elt->{Agent};   return $a if ref $a;
+      $a = $elt->{'cc:Agent'}; return $a if ref $a;
+      return $elt;
+    };
+    my $getthingandurl = sub {
+      my ($thing, $elt, $thingdefault, $urldefault) = @_;
+      $thingdefault ||= ''; $urldefault ||= '';
+      $self->{'_'.$thing} = $thingdefault;
+      $self->{'_'.$thing.'_url'} = $urldefault;
+      if (ref $elt) {
+        my $agent = $getagent->($elt);
+        if (ref $agent) {
+          $self->{'_'.$thing} = _get_content($agent->{'dc:title'}
+                                             || $agent->{'title'}) || $thingdefault;
+          $self->{'_'.$thing.'_url'} = $agent->{att}->{'rdf:about'} || $urldefault;
+        }}
+    };
+
+    $getthingandurl->('publisher', $work->{'dc:publisher'},
+                      # With defaults:
+                      'Open Clip Art Library', 'http://www.openclipart.org/');
+    $getthingandurl->('creator', $work->{'dc:creator'});
+    $getthingandurl->('owner', $work->{'dc:rights'});
 
     $self->{_title}         = _get_content($work->{'dc:title'}) || '';
     $self->{_description}   = _get_content($work->{'dc:description'}) || '';
@@ -303,8 +348,12 @@ sub parse {
     $self->{_owner}         = _get_content($work->{'dc:rights'}->{'cc:Agent'}->{'dc:title'}) || '';
     $self->{_owner_url}     = ''; # TODO
     $self->{_license}       = _get_content($work->{'cc:license'}->{'rdf:resource'}) || '';
-    $self->{_license_date}  = ''; # TODO
-    $self->{_language}      = 'en'; # TODO
+    # TODO: Does the above work?  Or should it be the following?
+    #  || $work-}{'cc:license'}->{att}->{'rdf:resource'} || '';
+    $self->{_license_date}  = _get_content($work->{'cc:license'}->{'dc:date'}) || '';
+    $self->{_language}      = _get_content($work->{'dc:language'}) || 'en';
+    $self->{_about_url}     = $work->{att}->{'rdf:about'} || '';
+    $self->{_date}          = _get_content($work->{'dc:date'}) || '';
 
     $self->{_creator}       ||= $self->{_owner};
     $self->{_creator_url}   ||= $self->{_owner_url};
@@ -312,16 +361,23 @@ sub parse {
     $self->{_owner_url}     ||= $self->{_creator_url};
     $self->{_publisher}     ||= $self->{_owner};
     $self->{_publisher_url} ||= $self->{_owner_url};
+    if ($optn{retain_xml}) {
+      $self->{_retained_xml} = \$twig; # Keep the actual SVG around.  (to_svg is worthless without this.)
+      $self->{_retained_declaration} = $retaindecl || ''; # and the XML declaration (and possibly also the doctype)
+    }
 
     if ($self->{_subject} &&
         ref $self->{_subject} eq 'HASH' &&
         defined $self->{_subject}->{'rdf:Bag'} &&
         ref $self->{_subject}->{'rdf:Bag'} eq 'HASH' &&
         defined $self->{_subject}->{'rdf:Bag'}->{'rdf:li'}) {
+      # How can the above condition EVER be true, when
+      # $self->{_subject} comes from _get_content?
 
         my $subjectwords = _get_content($self->{_subject}->{'rdf:Bag'}->{'rdf:li'});
         if (ref $subjectwords) { # Multiple keywords
             $self->{_keywords} = { map { $_=>1 } @$subjectwords };
+            # We *frequently* get "uninitialized value" warnings here, that may represent a problem.
         } else { # Only one keyword
             $self->{_keywords} = { $subjectwords => 1 } ;
         }
@@ -420,7 +476,7 @@ two-letter lettercodes, such as 'en', etc.
 
 =head2 strict_validation()
 
-Gets or sets the strict validation option.  
+Gets or sets the strict validation option.
 
 =cut
 
@@ -463,7 +519,7 @@ sub addKeyword {
 
 =head2 removeKeyword($kw)
 
-Removes a given keyword 
+Removes a given keyword
 
     $svgmeta->removeKeyword('Fruits and Vegetables');
 
@@ -547,8 +603,8 @@ sub to_text {
 
 =head2 esc_ents($text)
 
-Escapes '<', '>', and '&' and other extended characters
-to avoid causing rdf to become invalid.
+Escapes '<', '>', and '&' and single and double quote
+characters to avoid causing rdf to become invalid.
 
 =cut
 
@@ -570,23 +626,23 @@ character.
 
 sub to_rdf {
     my $self = shift;
-    
-    my $about_url     = ''; # TODO
+
+    my $about_url     = $self->esc_ents($self->about_url())       || '';
     my $title         = $self->esc_ents($self->title())           || '';
     my $creator       = $self->esc_ents($self->creator())         || '';
     my $creator_url   = $self->esc_ents($self->creator_url())     || '';
     my $owner         = $self->esc_ents($self->owner())           || '';
     my $owner_url     = $self->esc_ents($self->owner_url())       || '';
-    my $date          = ''; # TODO
+    my $date          = $self->esc_ents($self->date())            || '';
     my $license       = $self->esc_ents($self->license())         || '';
     my $license_date  = $self->esc_ents($self->license_date())    || '';
     my $description   = $self->esc_ents($self->description())     || '';
     my $subject       = $self->keywords_to_rdf() || '';
     my $publisher     = $self->esc_ents($self->publisher())       || '';
     my $publisher_url = $self->esc_ents($self->publisher_url())   || '';
-    my $language      = 'en'; # TODO
+    my $language      = $self->esc_ents($self->language())        || 'en';
 
-    my $license_rdf   = ''; 
+    my $license_rdf   = '';
     if ($license eq 'Public Domain'
         or $license eq 'http://web.resource.org/cc/PublicDomain') {
         $license = "http://web.resource.org/cc/PublicDomain";
@@ -628,7 +684,7 @@ sub to_rdf {
           <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
      </License>
 );
-    } elsif ($license eq 'http://creativecommons.org/licenses/by-nd/2.0/') { 
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nd/2.0/') {
         $license_rdf = qq(
      <License rdf:about="http://creativecommons.org/licenses/by-nd/2.0/">
           <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
@@ -637,7 +693,7 @@ sub to_rdf {
           <requires rdf:resource="http://web.resource.org/cc/Attribution" />
      </License>
 );
-    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc-nd/2.0/') { 
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc-nd/2.0/') {
         $license_rdf = qq(
      <License rdf:about="http://creativecommons.org/licenses/by-nc-nd/2.0/">
           <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
@@ -647,7 +703,7 @@ sub to_rdf {
           <prohibits rdf:resource="http://web.resource.org/cc/CommercialUse" />
      </License>
 );
-    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc-sa/2.0/') { 
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-nc-sa/2.0/') {
         $license_rdf = qq(
      <License rdf:about="http://creativecommons.org/licenses/by-nc-sa/2.0/">
           <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
@@ -659,7 +715,7 @@ sub to_rdf {
           <requires rdf:resource="http://web.resource.org/cc/ShareAlike" />
      </License>
 );
-    } elsif ($license eq 'http://creativecommons.org/licenses/by-sa/2.0/') { 
+    } elsif ($license eq 'http://creativecommons.org/licenses/by-sa/2.0/') {
         $license_rdf = qq(
      <License rdf:about="http://creativecommons.org/licenses/by-sa/2.0/">
           <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
@@ -715,6 +771,37 @@ $license_rdf
 
 }
 
+=head2 to_svg()
+
+Returns the SVG with the updated metadata embedded.  This can only be
+done if parse() was called with the retain_xml option.  Note that the
+code's layout can change a little, especially in terms of whitespace,
+but the semantics SHOULD be the same, except for the updated metadata.
+
+=cut
+
+sub to_svg {
+  my ($self) = shift;
+  if (not $self->{_retained_xml}) {
+    $self->{_ERRORMSG} = "Cannot do to_svg because the XML was not retained.  Pass a true value for the retain_xml option to parse to retain the XML, and check the return value of parse to make sure it succeeded.";
+    return undef;
+  }
+
+  my $xml = ${$self->{_retained_xml}}->root();
+  my $metadata = XML::Twig->new(
+                                map_xmlns => {
+                                              'http://web.resource.org/cc/' => "cc",
+                                              'http://www.w3.org/1999/02/22-rdf-syntax-ns#' => "rdf",
+                                              'http://purl.org/dc/elements/1.1/' => "dc",
+                                             },
+                                pretty_print => 'indented',
+                               );
+  $metadata->parse($self->to_rdf());
+#  delete $xml->{'#default:metadata'} if ref $xml->{'#default:metadata'};
+#  delete $xml->{'rdf:RDF'}           if ref $xml->{'rdf:RDF'};
+  $xml->{'metadata'} = $metadata;
+  return $self->{_retained_declaration} . $xml->root()->sprint();
+}
 
 1;
 __END__

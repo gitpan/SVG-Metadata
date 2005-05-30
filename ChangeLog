@@ -1,3 +1,7 @@
+2005-05-30 bryce
+
+	* Incorporating Jonadab's patch to fix metadata preservation.
+
 2005-04-09 Stephen Silver
 
 	* Fix to encode_entities() call to only encode <>&'"

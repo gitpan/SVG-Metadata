@@ -1,3 +1,26 @@
+
+2005-08-20 Bryce
+
+	* Adding a to_hash() routine that returns metadata as a Perl hash
+	
+2005-07-22 Jonadab
+	* Added try_harder() and adjusted parse() to support it.
+	* Made retain_xml() a method, like strict_validation() and try_harder()
+	  For backward compatibility, it is still also settable as an option to parse()
+	* When parse fails, it now returns undef in scalar context or an empty list
+	  in list context -- a false value either way.
+	* Bumped version number to 0.27
+        * The POD for subject() was not strictly accurate before and is now
+	  more accurate, because I changed parse() slightly to do part of
+	  what it says, and also elaborated on the POD to accurately reflect
+	  what to_rdf() does.
+	* Added some comments and fleshed out some more POD while I was tinkering.
+	
+2005-07-20 Jonadab
+	* Use XML::Twig methods instead of hash reference structure.
+	  This eliminates the HASH bug and makes to_svg() work better.
+	* Bumped version number to 0.26
+
 2005-05-30 bryce
 
 	* Incorporating Jonadab's patch to fix metadata preservation.
